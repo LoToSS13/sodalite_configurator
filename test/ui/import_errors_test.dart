@@ -41,6 +41,8 @@ void main() {
 
     expect(find.byKey(const Key('exportZip')), findsOneWidget);
     expect(find.textContaining('search.json'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('editor-tab-baseLayer')));
+    await tester.pumpAndSettle();
     expect(find.textContaining('base'), findsWidgets);
   });
 

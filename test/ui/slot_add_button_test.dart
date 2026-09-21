@@ -23,6 +23,9 @@ void main() {
   testWidgets('sources slot add menu does not offer app', (tester) async {
     await tester.pumpWidget(ConfiguratorApp(controller: controller, download: _unusedDownload));
 
+    await tester.tap(find.byKey(Key('editor-tab-baseLayer')));
+    await tester.pumpAndSettle();
+
     final geo = controller.root.childrenBySlot['baseLayer']!.single.childrenBySlot['geo']!.single;
     final addSources = find.byKey(Key('slot-add-${geo.id}-sources'));
     await tester.ensureVisible(addSources);

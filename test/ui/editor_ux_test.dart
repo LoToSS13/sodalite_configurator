@@ -4,8 +4,11 @@ import 'package:sodalite_configurator/document/document_controller.dart';
 import 'package:sodalite_configurator/schema/catalog.dart';
 import 'package:sodalite_configurator/schema/ids.dart';
 import 'package:sodalite_configurator/ui/app.dart';
-import 'package:sodalite_configurator/ui/editor/completeness_panel.dart';
+import 'package:sodalite_configurator/ui/editor/editor_section.dart';
+import 'package:sodalite_configurator/ui/editor/json_preview.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
+
+import 'tab_helpers.dart';
 
 void main() {
   late DocumentController controller;
@@ -28,6 +31,7 @@ void main() {
     final info = controller.root.childrenBySlot['baseLayer']!.single.childrenBySlot['info']!.single;
 
     await tester.pumpWidget(ConfiguratorApp(controller: controller, download: _unusedDownload));
+    await openEditorTab(tester, EditorSection.baseLayer);
 
     final add = find.byKey(ValueKey('${info.id}-paths-add'));
     await tester.ensureVisible(add);
@@ -60,6 +64,7 @@ void main() {
         .single;
 
     await tester.pumpWidget(ConfiguratorApp(controller: controller, download: _unusedDownload));
+    await openEditorTab(tester, EditorSection.baseLayer);
 
     final add = find.byKey(ValueKey('${attachments.id}-extensions-add'));
     await tester.ensureVisible(add);
@@ -98,6 +103,7 @@ void main() {
     final search = controller.root.childrenBySlot['search']!.single;
 
     await tester.pumpWidget(ConfiguratorApp(controller: controller, download: _unusedDownload));
+    await openEditorTab(tester, EditorSection.search);
 
     final remove = find.descendant(of: find.byKey(Key('node-${search.id}')), matching: find.byTooltip('Удалить'));
     await tester.ensureVisible(remove);
@@ -122,6 +128,7 @@ void main() {
     controller.addChild(parentId: geo.id, slot: 'style', typeId: TypeIds.geoStyle);
 
     await tester.pumpWidget(ConfiguratorApp(controller: controller, download: _unusedDownload));
+    await openEditorTab(tester, EditorSection.baseLayer);
 
     expect(find.text('точка'), findsNothing);
     final style = controller
@@ -142,6 +149,7 @@ void main() {
     final geometry = controller.root.childrenBySlot['objectCreation']!.single.childrenBySlot['geometryTypes']!.single;
 
     await tester.pumpWidget(ConfiguratorApp(controller: controller, download: _unusedDownload));
+    await openEditorTab(tester, EditorSection.objectCreation);
 
     final dropdown = find.byKey(ValueKey('${geometry.id}-type'));
     await tester.ensureVisible(dropdown);
@@ -152,7 +160,7 @@ void main() {
     expect(find.text('point').hitTestable(), findsNothing);
   });
 
-  testWidgets('narrow viewport stacks the completeness panel under the form', (tester) async {
+  testWidgets('narrow viewport stacks the json preview under the form', (tester) async {
     tester.view.physicalSize = const Size(400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -160,7 +168,7 @@ void main() {
     await tester.pumpWidget(ConfiguratorApp(controller: controller, download: _unusedDownload));
 
     final form = tester.getRect(find.byKey(Key('node-${controller.root.id}')));
-    final panel = tester.getRect(find.byType(CompletenessPanel));
+    final panel = tester.getRect(find.byType(JsonPreview));
     expect(panel.top, greaterThan(form.top));
   });
 
@@ -170,6 +178,7 @@ void main() {
     final second = controller.root.childrenBySlot['additionalLayers']!.last;
 
     await tester.pumpWidget(ConfiguratorApp(controller: controller, download: _unusedDownload));
+    await openEditorTab(tester, EditorSection.additionalLayers);
 
     final moveUp = find.byKey(Key('move-up-${second.id}'));
     await tester.ensureVisible(moveUp);

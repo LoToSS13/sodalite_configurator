@@ -73,10 +73,6 @@ class BlockCard extends StatelessWidget {
   }
 
   List<Widget> _slotSection(BuildContext context, SlotSpec slot) {
-    if (slot.key == 'objectCreation' || slot.key == 'search') {
-      return [_featureSlot(context, slot)];
-    }
-
     final children = node.childrenBySlot[slot.key] ?? const <Node>[];
     return [
       for (var index = 0; index < children.length; index++)
@@ -102,31 +98,6 @@ class BlockCard extends StatelessWidget {
     ];
   }
 
-  Widget _featureSlot(BuildContext context, SlotSpec slot) {
-    final children = node.childrenBySlot[slot.key] ?? const <Node>[];
-    if (children.isNotEmpty) {
-      final child = children.first;
-      return Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: BlockCard(
-          node: child,
-          controller: controller,
-          onRemove: () => _confirmDisableFeature(
-            context,
-            onConfirm: slot.key == 'objectCreation' ? controller.disableObjectCreation : controller.disableSearch,
-          ),
-        ),
-      );
-    }
-
-    final label = slot.key == 'objectCreation' ? UiStrings.enableObjectCreation : UiStrings.enableSearch;
-    final onPressed = slot.key == 'objectCreation' ? controller.enableObjectCreation : controller.enableSearch;
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: DashedSlotButton(label: label, onPressed: onPressed),
-    );
-  }
-
   bool _canAdd(SlotSpec slot, int count) {
     return switch (slot.cardinality) {
       SlotCardinality.list => true,
@@ -139,7 +110,7 @@ class BlockCard extends StatelessWidget {
   }
 }
 
-Future<void> _confirmDisableFeature(BuildContext context, {required VoidCallback onConfirm}) async {
+Future<void> confirmDisableFeature(BuildContext context, {required VoidCallback onConfirm}) async {
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(

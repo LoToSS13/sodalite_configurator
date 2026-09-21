@@ -3,6 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sodalite_configurator/document/document_controller.dart';
 import 'package:sodalite_configurator/schema/catalog.dart';
 import 'package:sodalite_configurator/ui/app.dart';
+import 'package:sodalite_configurator/ui/editor/editor_section.dart';
+
+import 'tab_helpers.dart';
 
 void main() {
   late DocumentController incompleteController;
@@ -40,8 +43,11 @@ void main() {
     expect(find.text('Заголовок'), findsWidgets);
     expect(find.text('Подзаголовок'), findsOneWidget);
     expect(find.text('Required field is missing'), findsNothing);
-    expect(find.text('Приложение · Заголовок'), findsOneWidget);
     expect(find.text('Обязательное поле не заполнено'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('issuesMenu')));
+    await tester.pumpAndSettle();
+    expect(find.text('Приложение · Заголовок'), findsOneWidget);
   });
 
   testWidgets('invalid integer input drops the model value and blocks export', (tester) async {
@@ -50,6 +56,7 @@ void main() {
     expect(completeController.canExport, isTrue);
 
     await tester.pumpWidget(ConfiguratorApp(controller: completeController, download: _unusedDownload));
+    await openEditorTab(tester, EditorSection.baseLayer);
 
     final field = find.byKey(ValueKey('${geo.id}-visibilityThreshold'));
     await tester.ensureVisible(field);

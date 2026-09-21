@@ -1,0 +1,13 @@
+---
+description: Always commit finished work and push to main without asking
+alwaysApply: true
+---
+
+# Push to main
+
+Do not ask whether to commit or push. When a task is finished:
+
+1. Create a git commit on `main` (or the current branch if it is already `main`).
+2. Push to `origin` with `git push -u origin HEAD` if needed.
+
+Still follow git safety: no force-push, no `--no-verify`, no amending published commits unless the user explicitly asks.

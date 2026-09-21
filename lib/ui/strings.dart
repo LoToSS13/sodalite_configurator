@@ -21,6 +21,10 @@ abstract final class UiStrings {
   static const moveUp = 'Выше';
   static const moveDown = 'Ниже';
   static const addAdditionalLayer = '+ дополнительный слой';
+  static const addFile = 'Добавить файл';
+  static const tabApp = 'Приложение';
+  static const tabBaseLayer = 'Базовый слой';
+  static const tabAdditionalLayers = 'Доп. слои';
   static const jsonPreview = 'JSON';
   static const draftsHeading = 'Черновики';
   static const deleteDraft = 'Удалить';
