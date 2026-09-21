@@ -55,22 +55,33 @@ class _EditorPageState extends State<EditorPage> {
       listenable: widget.controller,
       builder: (context, _) {
         final controller = widget.controller;
+        final compactBar = MediaQuery.sizeOf(context).width < 720;
         return Scaffold(
           appBar: AppBar(
-            title: Text('${controller.root.fields['slug'] ?? ''}'),
+            title: Text('${controller.root.fields['slug'] ?? ''}', overflow: TextOverflow.ellipsis),
             actions: [
-              Center(child: Text(UiStrings.issuesCount(controller.issues.length))),
-              TextButton(
-                onPressed: () => setState(() => _jsonOpen = !_jsonOpen),
-                child: const Text(UiStrings.jsonPreview),
-              ),
-              const SizedBox(width: 12),
+              if (!compactBar) Center(child: Text(UiStrings.issuesCount(controller.issues.length))),
+              if (compactBar)
+                IconButton(
+                  tooltip: UiStrings.jsonPreview,
+                  isSelected: _jsonOpen,
+                  onPressed: () => setState(() => _jsonOpen = !_jsonOpen),
+                  icon: const Icon(Icons.code),
+                )
+              else
+                TextButton(
+                  onPressed: () => setState(() => _jsonOpen = !_jsonOpen),
+                  child: const Text(UiStrings.jsonPreview),
+                ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
                 child: FilledButton(
                   key: const Key('exportZip'),
+                  style: compactBar
+                      ? FilledButton.styleFrom(minimumSize: const Size(40, 40), padding: const EdgeInsets.all(8))
+                      : null,
                   onPressed: controller.canExport ? _export : null,
-                  child: const Text(UiStrings.downloadZip),
+                  child: compactBar ? const Icon(Icons.download, size: 20) : const Text(UiStrings.downloadZip),
                 ),
               ),
             ],
@@ -79,27 +90,37 @@ class _EditorPageState extends State<EditorPage> {
             children: [
               if (controller.hasImportNotes) _ImportNotesBanner(controller: controller),
               Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: BlockCard(node: controller.root, controller: controller),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 320,
-                      child: _jsonOpen
-                          ? JsonPreview(text: modulePreviewText(controller.root))
-                          : CompletenessPanel(
-                              issues: controller.issues,
-                              catalog: controller.catalog,
-                              root: controller.root,
-                              onIssueTap: _onIssueTap,
-                            ),
-                    ),
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final canvas = SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: BlockCard(node: controller.root, controller: controller),
+                    );
+                    final side = _jsonOpen
+                        ? JsonPreview(text: modulePreviewText(controller.root))
+                        : CompletenessPanel(
+                            issues: controller.issues,
+                            catalog: controller.catalog,
+                            root: controller.root,
+                            onIssueTap: _onIssueTap,
+                          );
+                    if (constraints.maxWidth < 720) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: canvas),
+                          SizedBox(height: 240, child: side),
+                        ],
+                      );
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: canvas),
+                        SizedBox(width: 320, child: side),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],

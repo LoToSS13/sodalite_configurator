@@ -7,11 +7,20 @@ import 'package:sodalite_configurator/ui/editor/slot_add_button.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
 
 class BlockCard extends StatelessWidget {
-  const BlockCard({super.key, required this.node, required this.controller, this.onRemove});
+  const BlockCard({
+    super.key,
+    required this.node,
+    required this.controller,
+    this.onRemove,
+    this.onMoveUp,
+    this.onMoveDown,
+  });
 
   final Node node;
   final DocumentController controller;
   final VoidCallback? onRemove;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
 
   @override
   Widget build(BuildContext context) {
@@ -37,32 +46,52 @@ class BlockCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(child: Text(type.labelRu, style: Theme.of(context).textTheme.titleMedium)),
+                if (onMoveUp != null)
+                  IconButton(
+                    key: Key('move-up-${node.id}'),
+                    tooltip: UiStrings.moveUp,
+                    onPressed: onMoveUp,
+                    icon: const Icon(Icons.arrow_upward),
+                  ),
+                if (onMoveDown != null)
+                  IconButton(
+                    key: Key('move-down-${node.id}'),
+                    tooltip: UiStrings.moveDown,
+                    onPressed: onMoveDown,
+                    icon: const Icon(Icons.arrow_downward),
+                  ),
                 if (onRemove != null)
                   IconButton(tooltip: 'Удалить', onPressed: onRemove, icon: const Icon(Icons.close)),
               ],
             ),
             FieldControls(node: node, fields: type.fields, controller: controller),
-            for (final slot in type.slots) ..._slotSection(slot),
+            for (final slot in type.slots) ..._slotSection(context, slot),
           ],
         ),
       ),
     );
   }
 
-  List<Widget> _slotSection(SlotSpec slot) {
+  List<Widget> _slotSection(BuildContext context, SlotSpec slot) {
     if (slot.key == 'objectCreation' || slot.key == 'search') {
-      return [_featureSlot(slot)];
+      return [_featureSlot(context, slot)];
     }
 
     final children = node.childrenBySlot[slot.key] ?? const <Node>[];
     return [
-      for (final child in children)
+      for (var index = 0; index < children.length; index++)
         Padding(
           padding: const EdgeInsets.only(top: 8),
           child: BlockCard(
-            node: child,
+            node: children[index],
             controller: controller,
-            onRemove: _canRemove(slot) ? () => controller.removeNode(child.id) : null,
+            onRemove: _canRemove(slot) ? () => controller.removeNode(children[index].id) : null,
+            onMoveUp: slot.cardinality == SlotCardinality.list && index > 0
+                ? () => controller.moveChild(children[index].id, offset: -1)
+                : null,
+            onMoveDown: slot.cardinality == SlotCardinality.list && index < children.length - 1
+                ? () => controller.moveChild(children[index].id, offset: 1)
+                : null,
           ),
         ),
       if (_canAdd(slot, children.length))
@@ -73,7 +102,7 @@ class BlockCard extends StatelessWidget {
     ];
   }
 
-  Widget _featureSlot(SlotSpec slot) {
+  Widget _featureSlot(BuildContext context, SlotSpec slot) {
     final children = node.childrenBySlot[slot.key] ?? const <Node>[];
     if (children.isNotEmpty) {
       final child = children.first;
@@ -82,7 +111,10 @@ class BlockCard extends StatelessWidget {
         child: BlockCard(
           node: child,
           controller: controller,
-          onRemove: slot.key == 'objectCreation' ? controller.disableObjectCreation : controller.disableSearch,
+          onRemove: () => _confirmDisableFeature(
+            context,
+            onConfirm: slot.key == 'objectCreation' ? controller.disableObjectCreation : controller.disableSearch,
+          ),
         ),
       );
     }
@@ -104,5 +136,22 @@ class BlockCard extends StatelessWidget {
 
   bool _canRemove(SlotSpec slot) {
     return slot.cardinality != SlotCardinality.one;
+  }
+}
+
+Future<void> _confirmDisableFeature(BuildContext context, {required VoidCallback onConfirm}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text(UiStrings.confirmDisableFeature),
+      content: const Text(UiStrings.confirmDisableFeatureBody),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text(UiStrings.cancel)),
+        TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text(UiStrings.confirm)),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    onConfirm();
   }
 }

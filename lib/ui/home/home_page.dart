@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:sodalite_configurator/codec/download.dart';
@@ -10,12 +12,14 @@ import 'package:sodalite_configurator/ui/editor/editor_page.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
 
 typedef PickZipBytesFn = Future<List<int>?> Function();
+typedef PickJsonFilesFn = Future<Map<String, String>?> Function();
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, required this.download, this.pickZipBytes, this.drafts});
+  const HomePage({super.key, required this.download, this.pickZipBytes, this.pickJsonFiles, this.drafts});
 
   final DownloadFn download;
   final PickZipBytesFn? pickZipBytes;
+  final PickJsonFilesFn? pickJsonFiles;
   final DraftStore? drafts;
 
   @override
@@ -50,6 +54,8 @@ class _HomePageState extends State<HomePage> {
               FilledButton(onPressed: _createModule, child: const Text(UiStrings.createModule)),
               const SizedBox(height: 12),
               OutlinedButton(onPressed: _openZip, child: const Text(UiStrings.openZip)),
+              const SizedBox(height: 12),
+              OutlinedButton(onPressed: _openJson, child: const Text(UiStrings.openJson)),
               const SizedBox(height: 24),
               FutureBuilder<List<DraftMeta>>(
                 future: _listed,
@@ -87,7 +93,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _createModule() async {
-    final slug = await showDialog<String>(context: context, builder: (context) => const _SlugDialog());
+    final taken = {for (final draft in await _drafts.list()) draft.slug};
+    if (!mounted) {
+      return;
+    }
+    final slug = await showDialog<String>(
+      context: context,
+      builder: (context) => _SlugDialog(takenSlugs: taken),
+    );
     if (slug == null || !mounted) {
       return;
     }
@@ -122,6 +135,37 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
+    await _openEditor(
+      DocumentController(
+        catalog: Catalog.modulePack(),
+        root: result.bundle!,
+        drafts: _drafts,
+        importWarnings: result.warnings,
+        importErrors: result.errors,
+      ),
+    );
+  }
+
+  Future<void> _openJson() async {
+    final files = await (widget.pickJsonFiles ?? _pickJsonFiles)();
+    if (files == null || !mounted) {
+      return;
+    }
+    final result = importLooseFiles(files, id: newNodeId);
+    if (result.bundle == null) {
+      if (!mounted) {
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text(UiStrings.importFailed),
+          content: Text(result.errors.join('\n')),
+          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))],
+        ),
+      );
+      return;
+    }
     await _openEditor(
       DocumentController(
         catalog: Catalog.modulePack(),
@@ -174,8 +218,26 @@ Future<List<int>?> _pickZipBytes() async {
   return picked?.files.single.bytes;
 }
 
+Future<Map<String, String>?> _pickJsonFiles() async {
+  final picked = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: const ['json'],
+    allowMultiple: true,
+    withData: true,
+  );
+  if (picked == null) {
+    return null;
+  }
+  return {
+    for (final file in picked.files)
+      if (file.bytes != null) file.name: utf8.decode(file.bytes!),
+  };
+}
+
 class _SlugDialog extends StatefulWidget {
-  const _SlugDialog();
+  const _SlugDialog({this.takenSlugs = const {}});
+
+  final Set<String> takenSlugs;
 
   @override
   State<_SlugDialog> createState() => _SlugDialogState();
@@ -191,13 +253,17 @@ class _SlugDialogState extends State<_SlugDialog> {
     super.dispose();
   }
 
-  bool get _valid => _pattern.hasMatch(_controller.text.trim());
+  String get _slug => _controller.text.trim();
+
+  bool get _taken => widget.takenSlugs.contains(_slug);
+
+  bool get _valid => _pattern.hasMatch(_slug) && !_taken;
 
   void _submit() {
     if (!_valid) {
       return;
     }
-    Navigator.of(context).pop(_controller.text.trim());
+    Navigator.of(context).pop(_slug);
   }
 
   @override
@@ -207,7 +273,10 @@ class _SlugDialogState extends State<_SlugDialog> {
       content: TextField(
         controller: _controller,
         autofocus: true,
-        decoration: InputDecoration(labelText: UiStrings.pathLabel('slug')),
+        decoration: InputDecoration(
+          labelText: UiStrings.pathLabel('slug'),
+          errorText: _taken ? UiStrings.slugTaken : null,
+        ),
         onChanged: (_) => setState(() {}),
         onSubmitted: (_) => _submit(),
       ),

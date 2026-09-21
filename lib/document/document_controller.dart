@@ -22,6 +22,7 @@ class DocumentController extends ChangeNotifier {
   }) : _root = root,
        importWarnings = List<ImportWarning>.unmodifiable(importWarnings),
        importErrors = List<String>.unmodifiable(importErrors) {
+    _persistedDraftSlug = root.fields['slug'] as String?;
     _revalidate();
   }
 
@@ -35,6 +36,7 @@ class DocumentController extends ChangeNotifier {
   String? _selectedId;
   List<Issue> _issues = const [];
   Timer? _draftTimer;
+  String? _persistedDraftSlug;
 
   Node get root => _root;
   String? get selectedId => _selectedId;
@@ -50,7 +52,7 @@ class DocumentController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setField(String nodeId, String key, Object? value) {
+  void setField(String nodeId, String key, Object? value, {bool saveDraft = true}) {
     final changed = _replaceNode(_root, nodeId, (node) {
       if (node.fields[key] == value && node.fields.containsKey(key)) {
         return node;
@@ -60,7 +62,58 @@ class DocumentController extends ChangeNotifier {
     if (changed == null || identical(changed, _root)) {
       return;
     }
-    _commit(changed);
+    _commit(changed, saveDraft: saveDraft);
+  }
+
+  Future<bool> trySetSlug(String slug) async {
+    final trimmed = slug.trim();
+    final old = _persistedDraftSlug ?? (_root.fields['slug'] as String? ?? '');
+    if (trimmed == old) {
+      setField(_root.id, 'slug', trimmed, saveDraft: false);
+      return true;
+    }
+    if (drafts != null) {
+      final existing = await drafts!.load(trimmed);
+      if (existing != null && existing.id != _root.id) {
+        setField(_root.id, 'slug', old, saveDraft: false);
+        return false;
+      }
+    }
+    setField(_root.id, 'slug', trimmed, saveDraft: false);
+    if (drafts != null) {
+      if (old.isNotEmpty) {
+        await drafts!.delete(old);
+      }
+      await drafts!.save(_root);
+      _persistedDraftSlug = trimmed;
+    }
+    return true;
+  }
+
+  void moveChild(String nodeId, {required int offset}) {
+    if (offset == 0) {
+      return;
+    }
+    final located = _locateChild(_root, nodeId);
+    if (located == null) {
+      return;
+    }
+    final nextIndex = located.index + offset;
+    final children = located.parent.childrenBySlot[located.slot]!;
+    if (nextIndex < 0 || nextIndex >= children.length) {
+      return;
+    }
+    final reordered = [...children];
+    final moved = reordered.removeAt(located.index);
+    reordered.insert(nextIndex, moved);
+    final changed = _replaceNode(
+      _root,
+      located.parent.id,
+      (node) => node.copyWith(childrenBySlot: {...node.childrenBySlot, located.slot: reordered}),
+    );
+    if (changed != null) {
+      _commit(changed);
+    }
   }
 
   void addChild({required String parentId, required String slot, required String typeId}) {
@@ -170,10 +223,12 @@ class DocumentController extends ChangeNotifier {
     return Node(id: newNodeId(), typeId: typeId, fields: fields);
   }
 
-  void _commit(Node root) {
+  void _commit(Node root, {bool saveDraft = true}) {
     _root = root;
     _revalidate();
-    _scheduleDraftSave();
+    if (saveDraft) {
+      _scheduleDraftSave();
+    }
     notifyListeners();
   }
 
@@ -188,7 +243,19 @@ class DocumentController extends ChangeNotifier {
   void _flushDraft() {
     _draftTimer?.cancel();
     _draftTimer = null;
-    drafts?.save(_root);
+    final drafts = this.drafts;
+    if (drafts == null) {
+      return;
+    }
+    final slug = _root.fields['slug'] as String? ?? '';
+    if (slug.isEmpty) {
+      return;
+    }
+    if (_persistedDraftSlug != null && _persistedDraftSlug != slug) {
+      drafts.delete(_persistedDraftSlug!);
+    }
+    drafts.save(_root);
+    _persistedDraftSlug = slug;
   }
 
   @override
@@ -202,6 +269,22 @@ class DocumentController extends ChangeNotifier {
   void _revalidate() {
     _issues = List<Issue>.unmodifiable(validate(_root, catalog));
   }
+}
+
+({Node parent, String slot, int index})? _locateChild(Node parent, String nodeId) {
+  for (final entry in parent.childrenBySlot.entries) {
+    final index = entry.value.indexWhere((child) => child.id == nodeId);
+    if (index != -1) {
+      return (parent: parent, slot: entry.key, index: index);
+    }
+    for (final child in entry.value) {
+      final nested = _locateChild(child, nodeId);
+      if (nested != null) {
+        return nested;
+      }
+    }
+  }
+  return null;
 }
 
 Node? _replaceNode(Node node, String nodeId, Node Function(Node node) replace) {

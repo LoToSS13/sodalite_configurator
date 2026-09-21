@@ -149,6 +149,55 @@ void main() {
     expect(storage.keys, ['sodalite-configurator.draft.land_v2']);
     saving.dispose();
   });
+
+  test('moveChild reorders siblings in a list slot', () {
+    controller.addChild(parentId: controller.root.id, slot: 'additionalLayers', typeId: TypeIds.layer);
+    controller.addChild(parentId: controller.root.id, slot: 'additionalLayers', typeId: TypeIds.layer);
+    final first = controller.root.childrenBySlot['additionalLayers']!.first;
+    final second = controller.root.childrenBySlot['additionalLayers']!.last;
+
+    controller.moveChild(second.id, offset: -1);
+
+    expect(controller.root.childrenBySlot['additionalLayers']!.map((layer) => layer.id), [second.id, first.id]);
+  });
+
+  test('trySetSlug refuses a slug that already has another draft', () async {
+    final storage = <String, String>{};
+    final drafts = MemoryDraftStore(storage);
+    var otherId = 0;
+    await drafts.save(newModuleBundle(slug: 'taken', id: () => 'other-${otherId++}'));
+
+    var id = 0;
+    final renaming = DocumentController(
+      catalog: catalog,
+      root: newModuleBundle(slug: 'land_v2', id: () => 'draft-${id++}'),
+      drafts: drafts,
+      draftDebounce: Duration.zero,
+    );
+
+    expect(await renaming.trySetSlug('taken'), isFalse);
+    expect(renaming.root.fields['slug'], 'land_v2');
+    renaming.dispose();
+  });
+
+  test('trySetSlug migrates the draft key', () async {
+    final storage = <String, String>{};
+    final drafts = MemoryDraftStore(storage);
+    var id = 0;
+    final renaming = DocumentController(
+      catalog: catalog,
+      root: newModuleBundle(slug: 'land_v2', id: () => 'draft-${id++}'),
+      drafts: drafts,
+      draftDebounce: Duration.zero,
+    );
+    await drafts.save(renaming.root);
+
+    expect(await renaming.trySetSlug('land_v3'), isTrue);
+    expect(renaming.root.fields['slug'], 'land_v3');
+    expect(await drafts.load('land_v2'), isNull);
+    expect(await drafts.load('land_v3'), isNotNull);
+    renaming.dispose();
+  });
 }
 
 Node _baseGeo(Node root) {

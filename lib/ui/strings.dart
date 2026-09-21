@@ -5,11 +5,21 @@ import 'package:sodalite_configurator/schema/node.dart';
 abstract final class UiStrings {
   static const createModule = 'Создать модуль';
   static const openZip = 'Открыть zip';
+  static const openJson = 'Открыть JSON';
   static const downloadZip = 'Скачать zip';
   static const importFailed = 'Не удалось открыть модуль';
   static const importNotesHeading = 'Предупреждения импорта';
   static const enableObjectCreation = 'Включить создание объектов';
   static const enableSearch = 'Включить поиск';
+  static const confirmDisableFeature = 'Выключить функцию?';
+  static const confirmDisableFeatureBody = 'Карточка и все вложенные поля будут удалены.';
+  static const cancel = 'Отмена';
+  static const confirm = 'Выключить';
+  static const addEntry = 'Добавить пару';
+  static const addValue = 'Добавить значение';
+  static const slugTaken = 'Черновик с таким идентификатором уже есть';
+  static const moveUp = 'Выше';
+  static const moveDown = 'Ниже';
   static const addAdditionalLayer = '+ дополнительный слой';
   static const jsonPreview = 'JSON';
   static const draftsHeading = 'Черновики';
@@ -97,6 +107,30 @@ abstract final class UiStrings {
   };
 
   static String pathLabel(String key) => pathLabels[key] ?? key;
+
+  static const Map<String, String> enumLabels = {
+    'eq': 'равно',
+    'noteq': 'не равно',
+    'like': 'содержит',
+    'notlike': 'не содержит',
+    'gt': 'больше',
+    'lt': 'меньше',
+    'gte': 'не меньше',
+    'lte': 'не больше',
+    'in': 'в списке',
+    'notin': 'не в списке',
+    'empty': 'пусто',
+    'notempty': 'не пусто',
+    'and': 'и',
+    'or': 'или',
+    'isnull': 'пусто',
+    'isnotnull': 'не пусто',
+    'point': 'точка',
+    'line': 'линия',
+    'polygon': 'полигон',
+  };
+
+  static String enumLabel(String value) => enumLabels[value] ?? value;
 
   static String issueHeadline(Issue issue, Catalog catalog, Node root) {
     final node = root.find(issue.nodeId);

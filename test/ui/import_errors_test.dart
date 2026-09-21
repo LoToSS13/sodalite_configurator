@@ -1,6 +1,8 @@
 import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sodalite_configurator/persistence/draft_store.dart';
+import 'package:sodalite_configurator/schema/catalog.dart';
 import 'package:sodalite_configurator/ui/app.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
 
@@ -40,6 +42,40 @@ void main() {
     expect(find.byKey(const Key('exportZip')), findsOneWidget);
     expect(find.textContaining('search.json'), findsOneWidget);
     expect(find.textContaining('base'), findsWidgets);
+  });
+
+  testWidgets('open json files loads a module', (tester) async {
+    await tester.pumpWidget(
+      ConfiguratorApp(
+        download: _unusedDownload,
+        pickJsonFiles: () async => {
+          'app.json': '{"title":"Land","subtitle":"Map"}',
+          'base_layer.json': '{"geo":{"alias":"base"}}',
+        },
+      ),
+    );
+
+    await tester.tap(find.text(UiStrings.openJson));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('exportZip')), findsOneWidget);
+    expect(find.text('Land'), findsWidgets);
+  });
+
+  testWidgets('create module refuses a slug that already has a draft', (tester) async {
+    var id = 0;
+    final drafts = MemoryDraftStore({});
+    await drafts.save(newModuleBundle(slug: 'taken', id: () => 'taken-${id++}'));
+
+    await tester.pumpWidget(ConfiguratorApp(download: _unusedDownload, drafts: drafts));
+
+    await tester.tap(find.text(UiStrings.createModule));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'taken');
+    await tester.pump();
+
+    expect(find.text(UiStrings.slugTaken), findsOneWidget);
+    expect(tester.widget<TextButton>(find.widgetWithText(TextButton, 'OK')).onPressed, isNull);
   });
 }
 

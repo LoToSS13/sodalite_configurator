@@ -6,11 +6,19 @@ import 'package:sodalite_configurator/ui/editor/editor_page.dart';
 import 'package:sodalite_configurator/ui/home/home_page.dart';
 
 class ConfiguratorApp extends StatelessWidget {
-  const ConfiguratorApp({super.key, this.controller, this.download, this.pickZipBytes, this.drafts});
+  const ConfiguratorApp({
+    super.key,
+    this.controller,
+    this.download,
+    this.pickZipBytes,
+    this.pickJsonFiles,
+    this.drafts,
+  });
 
   final DocumentController? controller;
   final DownloadFn? download;
   final PickZipBytesFn? pickZipBytes;
+  final PickJsonFilesFn? pickJsonFiles;
   final DraftStore? drafts;
 
   @override
@@ -20,7 +28,7 @@ class ConfiguratorApp extends StatelessWidget {
       title: 'Sodalite Configurator',
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2B4C7E))),
       home: controller == null
-          ? HomePage(download: downloadFn, pickZipBytes: pickZipBytes, drafts: drafts)
+          ? HomePage(download: downloadFn, pickZipBytes: pickZipBytes, pickJsonFiles: pickJsonFiles, drafts: drafts)
           : EditorPage(controller: controller!, download: downloadFn),
     );
   }
