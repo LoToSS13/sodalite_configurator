@@ -31,7 +31,11 @@ class Catalog {
           SlotSpec(key: 'app', cardinality: SlotCardinality.one, allowedTypeIds: [TypeIds.app], required: true),
           SlotSpec(key: 'baseLayer', cardinality: SlotCardinality.one, allowedTypeIds: [TypeIds.layer], required: true),
           SlotSpec(key: 'additionalLayers', cardinality: SlotCardinality.list, allowedTypeIds: [TypeIds.layer]),
-          SlotSpec(key: 'objectCreation', cardinality: SlotCardinality.optionalOne, allowedTypeIds: ['objectCreation']),
+          SlotSpec(
+            key: 'objectCreation',
+            cardinality: SlotCardinality.optionalOne,
+            allowedTypeIds: [TypeIds.objectCreation],
+          ),
           SlotSpec(key: 'search', cardinality: SlotCardinality.optionalOne, allowedTypeIds: ['search']),
         ],
       ),
@@ -236,10 +240,27 @@ class Catalog {
         labelRu: 'Неизвестное действие',
         fields: [FieldSpec(key: 'rawType', kind: FieldKind.string, required: true)],
       ),
-      'objectCreation': const NodeType(
-        id: 'objectCreation',
+      TypeIds.objectCreation: const NodeType(
+        id: TypeIds.objectCreation,
         labelRu: 'Создание объектов',
-        fields: [FieldSpec(key: 'xsdPath', kind: FieldKind.nonEmptyString, required: true)],
+        fields: [
+          FieldSpec(key: 'xsdPath', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'requireDateWatermark', kind: FieldKind.boolean, required: true, defaultValue: true),
+          FieldSpec(key: 'saveToGallery', kind: FieldKind.boolean, required: true, defaultValue: false),
+          FieldSpec(key: 'color', kind: FieldKind.color),
+          FieldSpec(key: 'iconPath', kind: FieldKind.string),
+        ],
+        slots: [
+          SlotSpec(key: 'geometryTypes', cardinality: SlotCardinality.list, allowedTypeIds: [TypeIds.geometryType]),
+        ],
+      ),
+      TypeIds.geometryType: const NodeType(
+        id: TypeIds.geometryType,
+        labelRu: 'Тип геометрии',
+        fields: [
+          FieldSpec(key: 'type', kind: FieldKind.enumeration, required: true, enumValues: ['point', 'line', 'polygon']),
+          FieldSpec(key: 'autoMode', kind: FieldKind.boolean, defaultValue: false),
+        ],
       ),
       'search': const NodeType(
         id: 'search',

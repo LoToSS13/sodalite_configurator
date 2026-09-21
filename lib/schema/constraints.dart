@@ -33,6 +33,8 @@ List<Issue> extraConstraints(Node node, Catalog catalog) {
       return _validateGeometryTypes(node);
     case TypeIds.actionUnknown:
       return [Issue(nodeId: node.id, path: 'rawType', message: 'Unknown action type must be deleted')];
+    case TypeIds.geometryType:
+      return _validateGeometryTypeAutoMode(node);
   }
 
   return const [];
@@ -117,6 +119,13 @@ void _validateObjectPlaceholders(Node node, String field, Set<String> endpointKe
       );
     }
   }
+}
+
+List<Issue> _validateGeometryTypeAutoMode(Node node) {
+  if (node.fields['autoMode'] == true && node.fields['type'] != 'point') {
+    return [Issue(nodeId: node.id, path: 'autoMode', message: 'autoMode is only allowed for point geometry')];
+  }
+  return const [];
 }
 
 List<Issue> _validateGeometryTypes(Node action) {

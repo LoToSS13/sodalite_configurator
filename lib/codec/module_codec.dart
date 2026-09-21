@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:sodalite_configurator/codec/app_codec.dart';
 import 'package:sodalite_configurator/codec/layer_codec.dart';
+import 'package:sodalite_configurator/codec/object_creation_codec.dart';
 import 'package:sodalite_configurator/schema/ids.dart';
 import 'package:sodalite_configurator/schema/node.dart';
 
@@ -37,7 +38,7 @@ ModuleFiles encodeModule(Node bundle) {
     app: encodeApp(app),
     baseLayer: encodeLayer(baseLayer),
     additionalLayers: additionalLayers.map(encodeLayer).toList(),
-    objectCreation: objectCreation == null ? null : _encodeStub(objectCreation),
+    objectCreation: objectCreation == null ? null : encodeObjectCreation(objectCreation),
     search: search == null ? null : _encodeStub(search),
   );
 }
@@ -64,15 +65,9 @@ ModuleFiles encodeModule(Node bundle) {
     if (additionalLayers.isNotEmpty) 'additionalLayers': additionalLayers,
   };
   if (files.objectCreation != null) {
-    children['objectCreation'] = [
-      _decodeStub(
-        files.objectCreation!,
-        id: id(),
-        typeId: 'objectCreation',
-        file: 'object_creation.json',
-        warnings: warnings,
-      ),
-    ];
+    final decoded = decodeObjectCreation(files.objectCreation!, id: id());
+    children['objectCreation'] = [decoded.node];
+    warnings.addAll(decoded.warnings);
   }
   if (files.search != null) {
     children['search'] = [

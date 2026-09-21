@@ -100,7 +100,7 @@ class DocumentController extends ChangeNotifier {
   }
 
   void enableObjectCreation() {
-    addChild(parentId: _root.id, slot: 'objectCreation', typeId: 'objectCreation');
+    addChild(parentId: _root.id, slot: 'objectCreation', typeId: TypeIds.objectCreation);
   }
 
   void disableObjectCreation() {

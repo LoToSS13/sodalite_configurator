@@ -17,4 +17,6 @@ abstract final class TypeIds {
   static const actionInformationChange = 'actionInformationChange';
   static const actionGeometryChange = 'actionGeometryChange';
   static const actionUnknown = 'actionUnknown';
+  static const objectCreation = 'objectCreation';
+  static const geometryType = 'geometryType';
 }

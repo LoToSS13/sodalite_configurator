@@ -72,6 +72,9 @@ abstract final class UiStrings {
     'requireDateWatermark': 'Добавлять дату на изображение',
     'saveToGallery': 'Сохранять в галерею',
     'geometryTypes': 'Типы геометрии',
+    'iconPath': 'Путь к иконке',
+    'autoMode': 'Автоматический режим',
+    'type': 'Тип',
     'rawType': 'Неизвестный тип действия',
     'style': 'Стиль',
     'sources': 'Источники',
@@ -133,6 +136,9 @@ abstract final class UiStrings {
     }
     if (message.startsWith('A non-empty value is required')) {
       return 'Нужно непустое значение';
+    }
+    if (message.startsWith('autoMode is only allowed')) {
+      return 'Автоматический режим доступен только для точки';
     }
     return message;
   }
