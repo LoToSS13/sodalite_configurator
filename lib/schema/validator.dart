@@ -1,4 +1,5 @@
 import 'package:sodalite_configurator/schema/catalog.dart';
+import 'package:sodalite_configurator/schema/constraints.dart';
 import 'package:sodalite_configurator/schema/field_spec.dart';
 import 'package:sodalite_configurator/schema/issue.dart';
 import 'package:sodalite_configurator/schema/node.dart';
@@ -29,6 +30,12 @@ void _validateNode(Node node, Catalog catalog, List<Issue> issues) {
   for (final slot in type.slots) {
     final children = node.childrenBySlot[slot.key] ?? const <Node>[];
     _validateSlot(node, slot, children, issues);
+  }
+
+  issues.addAll(extraConstraints(node, catalog));
+
+  for (final slot in type.slots) {
+    final children = node.childrenBySlot[slot.key] ?? const <Node>[];
     for (final child in children) {
       _validateNode(child, catalog, issues);
     }
