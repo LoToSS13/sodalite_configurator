@@ -79,7 +79,12 @@ class _EditorPageState extends State<EditorPage> {
               ),
               SizedBox(
                 width: 320,
-                child: CompletenessPanel(issues: controller.issues, onIssueTap: _onIssueTap),
+                child: CompletenessPanel(
+                  issues: controller.issues,
+                  catalog: controller.catalog,
+                  root: controller.root,
+                  onIssueTap: _onIssueTap,
+                ),
               ),
             ],
           ),

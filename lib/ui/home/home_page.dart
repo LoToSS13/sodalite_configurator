@@ -83,7 +83,7 @@ class _SlugDialogState extends State<_SlugDialog> {
       content: TextField(
         controller: _controller,
         autofocus: true,
-        decoration: const InputDecoration(labelText: 'slug'),
+        decoration: InputDecoration(labelText: UiStrings.pathLabel('slug')),
         onChanged: (_) => setState(() {}),
         onSubmitted: (_) => _submit(),
       ),

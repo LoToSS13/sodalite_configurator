@@ -32,6 +32,35 @@ void main() {
 
     expect(tester.widget<FilledButton>(find.byKey(const Key('exportZip'))).onPressed, isNotNull);
   });
+
+  testWidgets('field labels and issues are in Russian', (tester) async {
+    await tester.pumpWidget(ConfiguratorApp(controller: incompleteController, download: _unusedDownload));
+
+    expect(find.text('title'), findsNothing);
+    expect(find.text('Заголовок'), findsWidgets);
+    expect(find.text('Подзаголовок'), findsOneWidget);
+    expect(find.text('Required field is missing'), findsNothing);
+    expect(find.text('Приложение · Заголовок'), findsOneWidget);
+    expect(find.text('Обязательное поле не заполнено'), findsWidgets);
+  });
+
+  testWidgets('invalid integer input drops the model value and blocks export', (tester) async {
+    final geo = completeController.root.childrenBySlot['baseLayer']!.single.childrenBySlot['geo']!.single;
+    completeController.setField(geo.id, 'visibilityThreshold', 16);
+    expect(completeController.canExport, isTrue);
+
+    await tester.pumpWidget(ConfiguratorApp(controller: completeController, download: _unusedDownload));
+
+    final field = find.byKey(ValueKey('${geo.id}-visibilityThreshold'));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, 'abc');
+    await tester.pump();
+
+    final updatedGeo = completeController.root.childrenBySlot['baseLayer']!.single.childrenBySlot['geo']!.single;
+    expect(updatedGeo.fields['visibilityThreshold'], isNot(16));
+    expect(completeController.canExport, isFalse);
+    expect(tester.widget<FilledButton>(find.byKey(const Key('exportZip'))).onPressed, isNull);
+  });
 }
 
 DocumentController _controller() {
