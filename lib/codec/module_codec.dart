@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sodalite_configurator/codec/app_codec.dart';
 import 'package:sodalite_configurator/codec/layer_codec.dart';
 import 'package:sodalite_configurator/codec/object_creation_codec.dart';
+import 'package:sodalite_configurator/codec/search_codec.dart';
 import 'package:sodalite_configurator/schema/ids.dart';
 import 'package:sodalite_configurator/schema/node.dart';
 
@@ -39,7 +40,7 @@ ModuleFiles encodeModule(Node bundle) {
     baseLayer: encodeLayer(baseLayer),
     additionalLayers: additionalLayers.map(encodeLayer).toList(),
     objectCreation: objectCreation == null ? null : encodeObjectCreation(objectCreation),
-    search: search == null ? null : _encodeStub(search),
+    search: search == null ? null : encodeSearch(search),
   );
 }
 
@@ -70,9 +71,9 @@ ModuleFiles encodeModule(Node bundle) {
     warnings.addAll(decoded.warnings);
   }
   if (files.search != null) {
-    children['search'] = [
-      _decodeStub(files.search!, id: id(), typeId: 'search', file: 'search.json', warnings: warnings),
-    ];
+    final decoded = decodeSearch(files.search!, id: id());
+    children['search'] = [decoded.node];
+    warnings.addAll(decoded.warnings);
   }
 
   return (
@@ -92,21 +93,6 @@ List<Map<String, dynamic>> _normalizeAdditionalLayers(Object value) {
     return [Map<String, dynamic>.from(value)];
   }
   return [];
-}
-
-Map<String, dynamic> _encodeStub(Node node) => {'xsdPath': node.fields['xsdPath'] ?? ''};
-
-Node _decodeStub(
-  Map<String, dynamic> json, {
-  required String id,
-  required String typeId,
-  required String file,
-  required List<ImportWarning> warnings,
-}) {
-  for (final key in json.keys.where((key) => key != 'xsdPath')) {
-    warnings.add(ImportWarning(file: file, message: 'Unknown key "$key" at \$ was dropped.'));
-  }
-  return Node(id: id, typeId: typeId, fields: {'xsdPath': json['xsdPath'] ?? ''});
 }
 
 void _warnUnknownApp(Map<String, dynamic> json, List<ImportWarning> warnings) {

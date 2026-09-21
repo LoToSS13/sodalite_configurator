@@ -35,6 +35,12 @@ List<Issue> extraConstraints(Node node, Catalog catalog) {
       return [Issue(nodeId: node.id, path: 'rawType', message: 'Unknown action type must be deleted')];
     case TypeIds.geometryType:
       return _validateGeometryTypeAutoMode(node);
+    case TypeIds.searchObject:
+      return _validateSearchObject(node);
+    case TypeIds.searchFilterList:
+      return _validateSearchFilterList(node);
+    case TypeIds.searchFilterInvalid:
+      return [Issue(nodeId: node.id, path: 'reason', message: 'Invalid search filter must be fixed or deleted')];
   }
 
   return const [];
@@ -119,6 +125,40 @@ void _validateObjectPlaceholders(Node node, String field, Set<String> endpointKe
       );
     }
   }
+}
+
+List<Issue> _validateSearchObject(Node node) {
+  final issues = <Issue>[];
+  final paths = node.fields['paths'];
+  if (paths is Map && paths.isEmpty) {
+    issues.add(Issue(nodeId: node.id, path: 'paths', message: 'At least one path is required'));
+  }
+  final attribute = node.fields['attribute'];
+  if (attribute is String && attribute.contains('/')) {
+    issues.add(Issue(nodeId: node.id, path: 'attribute', message: 'attribute must not contain /'));
+  }
+  final jetAlias = _nonEmptyString(node.fields['aopJetAlias']);
+  final keyField = _nonEmptyString(node.fields['aopKeyField']);
+  if (jetAlias != keyField) {
+    issues.add(
+      Issue(
+        nodeId: node.id,
+        path: jetAlias ? 'aopKeyField' : 'aopJetAlias',
+        message: 'alternativePositionObject requires both jetAlias and keyField',
+      ),
+    );
+  }
+  return issues;
+}
+
+bool _nonEmptyString(Object? value) => value is String && value.trim().isNotEmpty;
+
+List<Issue> _validateSearchFilterList(Node node) {
+  final value = node.fields['value'];
+  if (value is List && value.isEmpty) {
+    return [Issue(nodeId: node.id, path: 'value', message: 'At least one list value is required')];
+  }
+  return const [];
 }
 
 List<Issue> _validateGeometryTypeAutoMode(Node node) {

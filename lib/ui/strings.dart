@@ -74,7 +74,17 @@ abstract final class UiStrings {
     'geometryTypes': 'Типы геометрии',
     'iconPath': 'Путь к иконке',
     'autoMode': 'Автоматический режим',
-    'type': 'Тип',
+    'placeholder': 'Подсказка поиска',
+    'searchObjects': 'Объекты поиска',
+    'objectKeyFieldPath': 'Путь ключа объекта',
+    'attribute': 'Атрибут',
+    'subtitle1': 'Подзаголовок 1',
+    'subtitle2': 'Подзаголовок 2',
+    'aopJetAlias': 'Jet-алиас позиции',
+    'aopKeyField': 'Ключ позиции',
+    'filter': 'Фильтр',
+    'criterions': 'Критерии',
+    'reason': 'Причина',
     'rawType': 'Неизвестный тип действия',
     'style': 'Стиль',
     'sources': 'Источники',
@@ -139,6 +149,21 @@ abstract final class UiStrings {
     }
     if (message.startsWith('autoMode is only allowed')) {
       return 'Автоматический режим доступен только для точки';
+    }
+    if (message.contains('must not contain /')) {
+      return 'Атрибут не должен содержать /';
+    }
+    if (message.startsWith('alternativePositionObject')) {
+      return 'Нужны оба поля альтернативной позиции';
+    }
+    if (message.startsWith('Invalid search filter')) {
+      return 'Некорректный фильтр: исправьте или удалите';
+    }
+    if (message.startsWith('At least one path')) {
+      return 'Нужен хотя бы один путь';
+    }
+    if (message.startsWith('At least one list value')) {
+      return 'Нужно хотя бы одно значение списка';
     }
     return message;
   }

@@ -111,7 +111,7 @@ class DocumentController extends ChangeNotifier {
   }
 
   void enableSearch() {
-    addChild(parentId: _root.id, slot: 'search', typeId: 'search');
+    addChild(parentId: _root.id, slot: 'search', typeId: TypeIds.search);
   }
 
   void disableSearch() {

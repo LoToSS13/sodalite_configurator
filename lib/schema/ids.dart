@@ -19,4 +19,11 @@ abstract final class TypeIds {
   static const actionUnknown = 'actionUnknown';
   static const objectCreation = 'objectCreation';
   static const geometryType = 'geometryType';
+  static const search = 'search';
+  static const searchObject = 'searchObject';
+  static const searchFilterGroup = 'searchFilterGroup';
+  static const searchFilterScalar = 'searchFilterScalar';
+  static const searchFilterList = 'searchFilterList';
+  static const searchFilterEmpty = 'searchFilterEmpty';
+  static const searchFilterInvalid = 'searchFilterInvalid';
 }

@@ -36,7 +36,7 @@ class Catalog {
             cardinality: SlotCardinality.optionalOne,
             allowedTypeIds: [TypeIds.objectCreation],
           ),
-          SlotSpec(key: 'search', cardinality: SlotCardinality.optionalOne, allowedTypeIds: ['search']),
+          SlotSpec(key: 'search', cardinality: SlotCardinality.optionalOne, allowedTypeIds: [TypeIds.search]),
         ],
       ),
       TypeIds.app: const NodeType(
@@ -262,10 +262,97 @@ class Catalog {
           FieldSpec(key: 'autoMode', kind: FieldKind.boolean, defaultValue: false),
         ],
       ),
-      'search': const NodeType(
-        id: 'search',
+      TypeIds.search: const NodeType(
+        id: TypeIds.search,
         labelRu: 'Поиск',
-        fields: [FieldSpec(key: 'xsdPath', kind: FieldKind.nonEmptyString, required: true)],
+        fields: [FieldSpec(key: 'placeholder', kind: FieldKind.string)],
+        slots: [
+          SlotSpec(
+            key: 'searchObjects',
+            cardinality: SlotCardinality.list,
+            allowedTypeIds: [TypeIds.searchObject],
+            required: true,
+          ),
+        ],
+      ),
+      TypeIds.searchObject: const NodeType(
+        id: TypeIds.searchObject,
+        labelRu: 'Объект поиска',
+        fields: [
+          FieldSpec(key: 'alias', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'objectKeyFieldPath', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'attribute', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'paths', kind: FieldKind.stringMap, required: true),
+          FieldSpec(key: 'title', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'subtitle1', kind: FieldKind.string),
+          FieldSpec(key: 'subtitle2', kind: FieldKind.string),
+          FieldSpec(key: 'aopJetAlias', kind: FieldKind.string),
+          FieldSpec(key: 'aopKeyField', kind: FieldKind.string),
+        ],
+        slots: [
+          SlotSpec(
+            key: 'filter',
+            cardinality: SlotCardinality.optionalOne,
+            allowedTypeIds: [TypeIds.searchFilterGroup, TypeIds.searchFilterInvalid],
+          ),
+        ],
+      ),
+      TypeIds.searchFilterGroup: const NodeType(
+        id: TypeIds.searchFilterGroup,
+        labelRu: 'Группа фильтра',
+        fields: [
+          FieldSpec(key: 'operator', kind: FieldKind.enumeration, required: true, enumValues: ['and', 'or']),
+        ],
+        slots: [
+          SlotSpec(
+            key: 'criterions',
+            cardinality: SlotCardinality.list,
+            allowedTypeIds: [
+              TypeIds.searchFilterGroup,
+              TypeIds.searchFilterScalar,
+              TypeIds.searchFilterList,
+              TypeIds.searchFilterEmpty,
+              TypeIds.searchFilterInvalid,
+            ],
+            required: true,
+          ),
+        ],
+      ),
+      TypeIds.searchFilterScalar: const NodeType(
+        id: TypeIds.searchFilterScalar,
+        labelRu: 'Критерий фильтра',
+        fields: [
+          FieldSpec(
+            key: 'operator',
+            kind: FieldKind.enumeration,
+            required: true,
+            enumValues: ['eq', 'noteq', 'like', 'notlike', 'gt', 'lt', 'gte', 'lte'],
+          ),
+          FieldSpec(key: 'alias', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'value', kind: FieldKind.nonEmptyString, required: true),
+        ],
+      ),
+      TypeIds.searchFilterList: const NodeType(
+        id: TypeIds.searchFilterList,
+        labelRu: 'Списочный критерий',
+        fields: [
+          FieldSpec(key: 'operator', kind: FieldKind.enumeration, required: true, enumValues: ['in', 'notin']),
+          FieldSpec(key: 'alias', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'value', kind: FieldKind.stringList, required: true),
+        ],
+      ),
+      TypeIds.searchFilterEmpty: const NodeType(
+        id: TypeIds.searchFilterEmpty,
+        labelRu: 'Критерий пустоты',
+        fields: [
+          FieldSpec(key: 'operator', kind: FieldKind.enumeration, required: true, enumValues: ['empty', 'notempty']),
+          FieldSpec(key: 'alias', kind: FieldKind.nonEmptyString, required: true),
+        ],
+      ),
+      TypeIds.searchFilterInvalid: const NodeType(
+        id: TypeIds.searchFilterInvalid,
+        labelRu: 'Некорректный фильтр',
+        fields: [FieldSpec(key: 'reason', kind: FieldKind.string, required: true)],
       ),
     });
   }
