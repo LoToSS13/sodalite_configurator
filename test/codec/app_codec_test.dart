@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sodalite_configurator/codec/app_codec.dart';
 import 'package:sodalite_configurator/codec/module_codec.dart';
+import 'package:sodalite_configurator/schema/catalog.dart';
 import 'package:sodalite_configurator/schema/ids.dart';
 import 'package:sodalite_configurator/schema/node.dart';
+import 'package:sodalite_configurator/schema/validator.dart';
 
 void main() {
   test('encodes app title and subtitle in schema order', () {
@@ -14,9 +16,11 @@ void main() {
 
   test('decodes a missing required title as an empty string', () {
     final app = decodeApp({'subtitle': 'Land objects'}, id: 'app');
+    final issues = validate(app, Catalog.modulePack());
 
     expect(app.typeId, TypeIds.app);
     expect(app.fields, {'title': '', 'subtitle': 'Land objects'});
+    expect(issues.any((issue) => issue.path == 'title'), isTrue);
   });
 
   test('warns about and drops an unknown app key', () {

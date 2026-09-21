@@ -35,7 +35,14 @@ class Catalog {
           SlotSpec(key: 'search', cardinality: SlotCardinality.optionalOne, allowedTypeIds: ['search']),
         ],
       ),
-      TypeIds.app: const NodeType(id: TypeIds.app, labelRu: 'Приложение'),
+      TypeIds.app: const NodeType(
+        id: TypeIds.app,
+        labelRu: 'Приложение',
+        fields: [
+          FieldSpec(key: 'title', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'subtitle', kind: FieldKind.nonEmptyString, required: true),
+        ],
+      ),
       TypeIds.layer: const NodeType(
         id: TypeIds.layer,
         labelRu: 'Слой',
