@@ -37,6 +37,19 @@ List<Issue> _validateInfo(Node info) {
   final paths = info.fields['paths'];
   final pathKeys = paths is Map ? paths.keys.whereType<String>().toSet() : const <String>{};
 
+  final invalidMediaCollections = info.fields['_invalidMediaCollections'];
+  if (invalidMediaCollections is List) {
+    for (final collection in invalidMediaCollections.whereType<String>()) {
+      issues.add(
+        Issue(
+          nodeId: info.id,
+          path: collection,
+          message: 'Imported media collection had the wrong type and was dropped',
+        ),
+      );
+    }
+  }
+
   for (final key in const ['titleContent', 'subtitleContent', 'statusContent']) {
     _validatePlaceholders(info, key, pathKeys, issues);
   }

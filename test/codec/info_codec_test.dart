@@ -184,6 +184,50 @@ void main() {
     expect(decoded.warnings.map((warning) => warning.message), contains('acceptance dropped'));
   });
 
+  test('drops non-list legacy fields without creating a section', () {
+    for (final invalidFields in <Object?>[null, <String, Object?>{}]) {
+      final decoded = decodeLayer(
+        {
+          'geo': {'alias': 'land'},
+          'info': {'alias': 'parcel', 'fields': invalidFields},
+        },
+        id: 'layer',
+        isBase: true,
+      );
+
+      final info = decoded.layer.childrenBySlot['info']!.single;
+      final messages = decoded.warnings.map((warning) => warning.message);
+
+      expect(info.childrenBySlot.containsKey('infoSections'), isFalse);
+      expect(messages, isNot(contains('legacy fields converted')));
+      expect(messages, contains('legacy fields dropped: expected a list'));
+    }
+  });
+
+  test('warns and blocks export when media collections have wrong types', () {
+    final decoded = decodeLayer(
+      {
+        'geo': {'alias': 'land'},
+        'info': {'alias': 'parcel', 'images': <String, Object?>{}, 'attachments': 'invalid'},
+      },
+      id: 'layer',
+      isBase: true,
+    );
+
+    final info = decoded.layer.childrenBySlot['info']!.single;
+    final messages = decoded.warnings.map((warning) => warning.message);
+    final issues = validate(decoded.layer, Catalog.modulePack());
+
+    expect(info.childrenBySlot.containsKey('images'), isFalse);
+    expect(info.childrenBySlot.containsKey('attachments'), isFalse);
+    expect(messages, contains('images dropped: expected a list'));
+    expect(messages, contains('attachments dropped: expected a list'));
+    expect(
+      issues.where((issue) => issue.nodeId == info.id).map((issue) => issue.path),
+      containsAll(['images', 'attachments']),
+    );
+  });
+
   test('catalog registers info fields, sections, media, and future slots', () {
     final catalog = Catalog.modulePack();
     final info = catalog.type(TypeIds.info);

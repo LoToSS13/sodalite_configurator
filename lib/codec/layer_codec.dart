@@ -147,7 +147,7 @@ Node _decodeInfo(Map<String, dynamic> json, {required String id, required List<I
 
   final children = <String, List<Node>>{};
   final sections = _decodeInfoSections(json['infoSections'], id: id, warnings: warnings);
-  if (json.containsKey('fields')) {
+  if (json['fields'] is List) {
     final legacyFields = _decodeFieldRows(
       json['fields'],
       id: '$id-legacy-section',
@@ -164,30 +164,40 @@ Node _decodeInfo(Map<String, dynamic> json, {required String id, required List<I
       ),
     );
     warnings.add(const ImportWarning(file: 'layer.json', message: 'legacy fields converted'));
+  } else if (json.containsKey('fields')) {
+    warnings.add(const ImportWarning(file: 'layer.json', message: 'legacy fields dropped: expected a list'));
   }
   if (sections.isNotEmpty) {
     children['infoSections'] = sections;
   }
 
-  final images = _decodeMediaSections(
-    json['images'],
+  final invalidMediaCollections = <String>[];
+  final images = _decodeInfoMediaCollection(
+    json,
+    key: 'images',
     id: '$id-images',
     typeId: TypeIds.imageSection,
     path: r'$.info.images',
     warnings: warnings,
+    invalidCollections: invalidMediaCollections,
   );
   if (images.isNotEmpty) {
     children['images'] = images;
   }
-  final attachments = _decodeMediaSections(
-    json['attachments'],
+  final attachments = _decodeInfoMediaCollection(
+    json,
+    key: 'attachments',
     id: '$id-attachments',
     typeId: TypeIds.attachmentSection,
     path: r'$.info.attachments',
     warnings: warnings,
+    invalidCollections: invalidMediaCollections,
   );
   if (attachments.isNotEmpty) {
     children['attachments'] = attachments;
+  }
+  if (invalidMediaCollections.isNotEmpty) {
+    fields['_invalidMediaCollections'] = invalidMediaCollections;
   }
 
   if (json.containsKey('preview')) {
@@ -278,6 +288,26 @@ Node _decodeFieldRow(
     }
   }
   return Node(id: id, typeId: TypeIds.fieldRow, fields: fields);
+}
+
+List<Node> _decodeInfoMediaCollection(
+  Map<String, dynamic> json, {
+  required String key,
+  required String id,
+  required String typeId,
+  required String path,
+  required List<ImportWarning> warnings,
+  required List<String> invalidCollections,
+}) {
+  if (!json.containsKey(key)) {
+    return [];
+  }
+  if (json[key] is! List) {
+    warnings.add(ImportWarning(file: 'layer.json', message: '$key dropped: expected a list'));
+    invalidCollections.add(key);
+    return [];
+  }
+  return _decodeMediaSections(json[key], id: id, typeId: typeId, path: path, warnings: warnings);
 }
 
 List<Node> _decodeMediaSections(
