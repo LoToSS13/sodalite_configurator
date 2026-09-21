@@ -68,28 +68,64 @@ class _EditorPageState extends State<EditorPage> {
               ),
             ],
           ),
-          body: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          body: Column(
             children: [
+              if (controller.hasImportNotes) _ImportNotesBanner(controller: controller),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: BlockCard(node: controller.root, controller: controller),
-                ),
-              ),
-              SizedBox(
-                width: 320,
-                child: CompletenessPanel(
-                  issues: controller.issues,
-                  catalog: controller.catalog,
-                  root: controller.root,
-                  onIssueTap: _onIssueTap,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: BlockCard(node: controller.root, controller: controller),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 320,
+                      child: CompletenessPanel(
+                        issues: controller.issues,
+                        catalog: controller.catalog,
+                        root: controller.root,
+                        onIssueTap: _onIssueTap,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _ImportNotesBanner extends StatelessWidget {
+  const _ImportNotesBanner({required this.controller});
+
+  final DocumentController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = [
+      ...controller.importErrors,
+      for (final warning in controller.importWarnings) '${warning.file}: ${warning.message}',
+    ];
+    return Material(
+      key: const Key('importWarningsBanner'),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(UiStrings.importNotesHeading, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            for (final line in lines) Text(line),
+          ],
+        ),
+      ),
     );
   }
 }

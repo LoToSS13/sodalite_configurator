@@ -6,6 +6,8 @@ abstract final class UiStrings {
   static const createModule = 'Создать модуль';
   static const openZip = 'Открыть zip';
   static const downloadZip = 'Скачать zip';
+  static const importFailed = 'Не удалось открыть модуль';
+  static const importNotesHeading = 'Предупреждения импорта';
   static const enableObjectCreation = 'Включить создание объектов';
   static const enableSearch = 'Включить поиск';
   static const addAdditionalLayer = '+ дополнительный слой';

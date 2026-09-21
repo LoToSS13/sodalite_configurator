@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:archive/archive.dart';
+import 'package:sodalite_configurator/codec/import_result.dart';
 import 'package:sodalite_configurator/codec/json_format.dart';
 import 'package:sodalite_configurator/codec/module_codec.dart';
 
@@ -58,6 +59,6 @@ List<int> buildModuleZip(ModuleFiles files) {
       objectCreation: readOptionalMap('object_creation.json'),
       search: readOptionalMap('search.json'),
     ),
-    warnings: <ImportWarning>[],
+    warnings: zipExtraFileWarnings(entries.keys, prefix: prefix),
   );
 }

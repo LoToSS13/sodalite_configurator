@@ -9,11 +9,20 @@ import 'package:sodalite_configurator/schema/slot_spec.dart';
 import 'package:sodalite_configurator/schema/validator.dart';
 
 class DocumentController extends ChangeNotifier {
-  DocumentController({required this.catalog, required Node root}) : _root = root {
+  DocumentController({
+    required this.catalog,
+    required Node root,
+    List<ImportWarning> importWarnings = const [],
+    List<String> importErrors = const [],
+  }) : _root = root,
+       importWarnings = List<ImportWarning>.unmodifiable(importWarnings),
+       importErrors = List<String>.unmodifiable(importErrors) {
     _revalidate();
   }
 
   final Catalog catalog;
+  final List<ImportWarning> importWarnings;
+  final List<String> importErrors;
 
   Node _root;
   String? _selectedId;
@@ -23,6 +32,7 @@ class DocumentController extends ChangeNotifier {
   String? get selectedId => _selectedId;
   List<Issue> get issues => _issues;
   bool get canExport => _issues.isEmpty;
+  bool get hasImportNotes => importWarnings.isNotEmpty || importErrors.isNotEmpty;
 
   void select(String? id) {
     if (_selectedId == id) {

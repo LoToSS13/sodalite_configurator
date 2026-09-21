@@ -1,15 +1,20 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:sodalite_configurator/codec/download.dart';
+import 'package:sodalite_configurator/codec/import_files.dart';
 import 'package:sodalite_configurator/document/document_controller.dart';
 import 'package:sodalite_configurator/schema/catalog.dart';
 import 'package:sodalite_configurator/schema/node.dart';
 import 'package:sodalite_configurator/ui/editor/editor_page.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
 
+typedef PickZipBytesFn = Future<List<int>?> Function();
+
 class HomePage extends StatelessWidget {
-  const HomePage({super.key, required this.download});
+  const HomePage({super.key, required this.download, this.pickZipBytes});
 
   final DownloadFn download;
+  final PickZipBytesFn? pickZipBytes;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +29,7 @@ class HomePage extends StatelessWidget {
             children: [
               FilledButton(onPressed: () => _createModule(context), child: const Text(UiStrings.createModule)),
               const SizedBox(height: 12),
-              const OutlinedButton(onPressed: null, child: Text(UiStrings.openZip)),
+              OutlinedButton(onPressed: () => _openZip(context), child: const Text(UiStrings.openZip)),
             ],
           ),
         ),
@@ -48,6 +53,54 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _openZip(BuildContext context) async {
+    final bytes = await (pickZipBytes ?? _pickZipBytes)();
+    if (bytes == null || !context.mounted) {
+      return;
+    }
+
+    final result = importZip(bytes, id: newNodeId);
+    if (result.bundle == null) {
+      if (!context.mounted) {
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text(UiStrings.importFailed),
+          content: Text(result.errors.join('\n')),
+          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))],
+        ),
+      );
+      return;
+    }
+
+    final controller = DocumentController(
+      catalog: Catalog.modulePack(),
+      root: result.bundle!,
+      importWarnings: result.warnings,
+      importErrors: result.errors,
+    );
+    if (!context.mounted) {
+      controller.dispose();
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EditorPage(controller: controller, download: download, ownsController: true),
+      ),
+    );
+  }
+}
+
+Future<List<int>?> _pickZipBytes() async {
+  final picked = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: const ['zip'],
+    withData: true,
+  );
+  return picked?.files.single.bytes;
 }
 
 class _SlugDialog extends StatefulWidget {
