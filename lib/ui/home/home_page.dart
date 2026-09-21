@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:sodalite_configurator/codec/download.dart';
 import 'package:sodalite_configurator/codec/import_files.dart';
 import 'package:sodalite_configurator/document/document_controller.dart';
+import 'package:sodalite_configurator/persistence/draft_store.dart';
 import 'package:sodalite_configurator/schema/catalog.dart';
 import 'package:sodalite_configurator/schema/node.dart';
 import 'package:sodalite_configurator/ui/editor/editor_page.dart';
@@ -10,11 +11,31 @@ import 'package:sodalite_configurator/ui/strings.dart';
 
 typedef PickZipBytesFn = Future<List<int>?> Function();
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key, required this.download, this.pickZipBytes});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key, required this.download, this.pickZipBytes, this.drafts});
 
   final DownloadFn download;
   final PickZipBytesFn? pickZipBytes;
+  final DraftStore? drafts;
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  late final DraftStore _drafts;
+  late Future<List<DraftMeta>> _listed;
+
+  @override
+  void initState() {
+    super.initState();
+    _drafts = widget.drafts ?? createDraftStore();
+    _reloadDrafts();
+  }
+
+  void _reloadDrafts() {
+    _listed = _drafts.list();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,13 +44,41 @@ class HomePage extends StatelessWidget {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
             children: [
-              FilledButton(onPressed: () => _createModule(context), child: const Text(UiStrings.createModule)),
+              FilledButton(onPressed: _createModule, child: const Text(UiStrings.createModule)),
               const SizedBox(height: 12),
-              OutlinedButton(onPressed: () => _openZip(context), child: const Text(UiStrings.openZip)),
+              OutlinedButton(onPressed: _openZip, child: const Text(UiStrings.openZip)),
+              const SizedBox(height: 24),
+              FutureBuilder<List<DraftMeta>>(
+                future: _listed,
+                builder: (context, snapshot) {
+                  final drafts = snapshot.data ?? const <DraftMeta>[];
+                  if (drafts.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(UiStrings.draftsHeading, style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      for (final draft in drafts)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(draft.title),
+                          subtitle: Text('${draft.slug} · ${draft.updatedAt.toLocal()}'),
+                          onTap: () => _openDraft(draft.slug),
+                          trailing: IconButton(
+                            tooltip: UiStrings.deleteDraft,
+                            onPressed: () => _deleteDraft(draft.slug),
+                            icon: const Icon(Icons.delete_outline),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -37,32 +86,29 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Future<void> _createModule(BuildContext context) async {
+  Future<void> _createModule() async {
     final slug = await showDialog<String>(context: context, builder: (context) => const _SlugDialog());
-    if (slug == null || !context.mounted) {
+    if (slug == null || !mounted) {
       return;
     }
-
-    final controller = DocumentController(
-      catalog: Catalog.modulePack(),
-      root: newModuleBundle(slug: slug, id: newNodeId),
-    );
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => EditorPage(controller: controller, download: download, ownsController: true),
+    await _openEditor(
+      DocumentController(
+        catalog: Catalog.modulePack(),
+        root: newModuleBundle(slug: slug, id: newNodeId),
+        drafts: _drafts,
       ),
     );
   }
 
-  Future<void> _openZip(BuildContext context) async {
-    final bytes = await (pickZipBytes ?? _pickZipBytes)();
-    if (bytes == null || !context.mounted) {
+  Future<void> _openZip() async {
+    final bytes = await (widget.pickZipBytes ?? _pickZipBytes)();
+    if (bytes == null || !mounted) {
       return;
     }
 
     final result = importZip(bytes, id: newNodeId);
     if (result.bundle == null) {
-      if (!context.mounted) {
+      if (!mounted) {
         return;
       }
       await showDialog<void>(
@@ -76,21 +122,46 @@ class HomePage extends StatelessWidget {
       return;
     }
 
-    final controller = DocumentController(
-      catalog: Catalog.modulePack(),
-      root: result.bundle!,
-      importWarnings: result.warnings,
-      importErrors: result.errors,
+    await _openEditor(
+      DocumentController(
+        catalog: Catalog.modulePack(),
+        root: result.bundle!,
+        drafts: _drafts,
+        importWarnings: result.warnings,
+        importErrors: result.errors,
+      ),
     );
-    if (!context.mounted) {
+  }
+
+  Future<void> _openDraft(String slug) async {
+    final root = await _drafts.load(slug);
+    if (root == null || !mounted) {
+      return;
+    }
+    await _openEditor(DocumentController(catalog: Catalog.modulePack(), root: root, drafts: _drafts));
+  }
+
+  Future<void> _deleteDraft(String slug) async {
+    await _drafts.delete(slug);
+    if (!mounted) {
+      return;
+    }
+    setState(_reloadDrafts);
+  }
+
+  Future<void> _openEditor(DocumentController controller) async {
+    if (!mounted) {
       controller.dispose();
       return;
     }
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => EditorPage(controller: controller, download: download, ownsController: true),
+        builder: (_) => EditorPage(controller: controller, download: widget.download, ownsController: true),
       ),
     );
+    if (mounted) {
+      setState(_reloadDrafts);
+    }
   }
 }
 

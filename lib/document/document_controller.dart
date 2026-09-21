@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:sodalite_configurator/codec/module_codec.dart';
 import 'package:sodalite_configurator/codec/zip_io.dart';
+import 'package:sodalite_configurator/persistence/draft_store.dart';
 import 'package:sodalite_configurator/schema/catalog.dart';
 import 'package:sodalite_configurator/schema/ids.dart';
 import 'package:sodalite_configurator/schema/issue.dart';
@@ -12,6 +15,8 @@ class DocumentController extends ChangeNotifier {
   DocumentController({
     required this.catalog,
     required Node root,
+    this.drafts,
+    this.draftDebounce = const Duration(milliseconds: 300),
     List<ImportWarning> importWarnings = const [],
     List<String> importErrors = const [],
   }) : _root = root,
@@ -21,12 +26,15 @@ class DocumentController extends ChangeNotifier {
   }
 
   final Catalog catalog;
+  final DraftStore? drafts;
+  final Duration draftDebounce;
   final List<ImportWarning> importWarnings;
   final List<String> importErrors;
 
   Node _root;
   String? _selectedId;
   List<Issue> _issues = const [];
+  Timer? _draftTimer;
 
   Node get root => _root;
   String? get selectedId => _selectedId;
@@ -165,7 +173,30 @@ class DocumentController extends ChangeNotifier {
   void _commit(Node root) {
     _root = root;
     _revalidate();
+    _scheduleDraftSave();
     notifyListeners();
+  }
+
+  void _scheduleDraftSave() {
+    if (drafts == null) {
+      return;
+    }
+    _draftTimer?.cancel();
+    _draftTimer = Timer(draftDebounce, _flushDraft);
+  }
+
+  void _flushDraft() {
+    _draftTimer?.cancel();
+    _draftTimer = null;
+    drafts?.save(_root);
+  }
+
+  @override
+  void dispose() {
+    if (_draftTimer != null) {
+      _flushDraft();
+    }
+    super.dispose();
   }
 
   void _revalidate() {

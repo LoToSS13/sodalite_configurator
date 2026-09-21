@@ -12,6 +12,8 @@ abstract final class UiStrings {
   static const enableSearch = 'Включить поиск';
   static const addAdditionalLayer = '+ дополнительный слой';
   static const jsonPreview = 'JSON';
+  static const draftsHeading = 'Черновики';
+  static const deleteDraft = 'Удалить';
   static const issuesHeading = 'Замечания';
   static const noIssues = 'Нет замечаний';
 

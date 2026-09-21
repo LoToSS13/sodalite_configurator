@@ -4,6 +4,7 @@ import 'package:sodalite_configurator/document/document_controller.dart';
 import 'package:sodalite_configurator/schema/issue.dart';
 import 'package:sodalite_configurator/ui/editor/block_card.dart';
 import 'package:sodalite_configurator/ui/editor/completeness_panel.dart';
+import 'package:sodalite_configurator/ui/editor/json_preview.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
 
 class EditorPage extends StatefulWidget {
@@ -18,6 +19,8 @@ class EditorPage extends StatefulWidget {
 }
 
 class _EditorPageState extends State<EditorPage> {
+  bool _jsonOpen = false;
+
   @override
   void dispose() {
     if (widget.ownsController) {
@@ -57,6 +60,10 @@ class _EditorPageState extends State<EditorPage> {
             title: Text('${controller.root.fields['slug'] ?? ''}'),
             actions: [
               Center(child: Text(UiStrings.issuesCount(controller.issues.length))),
+              TextButton(
+                onPressed: () => setState(() => _jsonOpen = !_jsonOpen),
+                child: const Text(UiStrings.jsonPreview),
+              ),
               const SizedBox(width: 12),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
@@ -83,12 +90,14 @@ class _EditorPageState extends State<EditorPage> {
                     ),
                     SizedBox(
                       width: 320,
-                      child: CompletenessPanel(
-                        issues: controller.issues,
-                        catalog: controller.catalog,
-                        root: controller.root,
-                        onIssueTap: _onIssueTap,
-                      ),
+                      child: _jsonOpen
+                          ? JsonPreview(text: modulePreviewText(controller.root))
+                          : CompletenessPanel(
+                              issues: controller.issues,
+                              catalog: controller.catalog,
+                              root: controller.root,
+                              onIssueTap: _onIssueTap,
+                            ),
                     ),
                   ],
                 ),

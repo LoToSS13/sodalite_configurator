@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sodalite_configurator/codec/zip_io.dart';
 import 'package:sodalite_configurator/document/document_controller.dart';
+import 'package:sodalite_configurator/persistence/draft_store.dart';
 import 'package:sodalite_configurator/schema/catalog.dart';
 import 'package:sodalite_configurator/schema/ids.dart';
 import 'package:sodalite_configurator/schema/node.dart';
@@ -132,6 +133,21 @@ void main() {
     expect(parsed.files.slug, 'land_v2');
     expect(parsed.files.app, {'title': 'Land', 'subtitle': 'Map'});
     expect(parsed.files.baseLayer['geo'], containsPair('alias', 'land'));
+  });
+
+  test('saves drafts after mutations', () async {
+    final storage = <String, String>{};
+    var id = 0;
+    final saving = DocumentController(
+      catalog: catalog,
+      root: newModuleBundle(slug: 'land_v2', id: () => 'draft-${id++}'),
+      drafts: MemoryDraftStore(storage),
+      draftDebounce: Duration.zero,
+    );
+    saving.setField(saving.root.childrenBySlot['app']!.single.id, 'title', 'Land');
+    await Future<void>.delayed(Duration.zero);
+    expect(storage.keys, ['sodalite-configurator.draft.land_v2']);
+    saving.dispose();
   });
 }
 
