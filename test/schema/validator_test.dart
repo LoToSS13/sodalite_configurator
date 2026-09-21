@@ -103,6 +103,52 @@ void main() {
     expect(validate(node, patternCatalog).single.path, 'code');
   });
 
+  test('missing required fields of every kind are issues', () {
+    final requiredCatalog = Catalog({
+      'required': NodeType(
+        id: 'required',
+        labelRu: 'Обязательные поля',
+        fields: const [
+          FieldSpec(key: 'string', kind: FieldKind.string, required: true),
+          FieldSpec(key: 'nonEmptyString', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'boolean', kind: FieldKind.boolean, required: true),
+          FieldSpec(key: 'integer', kind: FieldKind.integer, required: true),
+          FieldSpec(key: 'enumeration', kind: FieldKind.enumeration, required: true, enumValues: ['value']),
+          FieldSpec(key: 'color', kind: FieldKind.color, required: true),
+          FieldSpec(key: 'stringMap', kind: FieldKind.stringMap, required: true),
+          FieldSpec(key: 'stringList', kind: FieldKind.stringList, required: true),
+        ],
+      ),
+    });
+    const node = Node(id: 'missing-fields', typeId: 'required');
+
+    final paths = validate(node, requiredCatalog).map((issue) => issue.path).toSet();
+
+    expect(
+      paths,
+      equals({'string', 'nonEmptyString', 'boolean', 'integer', 'enumeration', 'color', 'stringMap', 'stringList'}),
+    );
+  });
+
+  test('wrong string boolean and integer runtime types are issues', () {
+    final typedCatalog = Catalog({
+      'typed': NodeType(
+        id: 'typed',
+        labelRu: 'Типизированные поля',
+        fields: const [
+          FieldSpec(key: 'string', kind: FieldKind.string),
+          FieldSpec(key: 'boolean', kind: FieldKind.boolean),
+          FieldSpec(key: 'integer', kind: FieldKind.integer),
+        ],
+      ),
+    });
+    const node = Node(id: 'wrong-types', typeId: 'typed', fields: {'string': 1, 'boolean': 'true', 'integer': '17'});
+
+    final paths = validate(node, typedCatalog).map((issue) => issue.path).toSet();
+
+    expect(paths, equals({'string', 'boolean', 'integer'}));
+  });
+
   group('slot cardinality', () {
     const leafType = NodeType(id: 'leaf', labelRu: 'Лист');
 

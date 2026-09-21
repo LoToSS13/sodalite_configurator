@@ -45,19 +45,27 @@ void _validateNode(Node node, Catalog catalog, List<Issue> issues) {
 void _validateField(Node node, FieldSpec spec, List<Issue> issues) {
   final value = node.fields[spec.key];
 
-  if (spec.kind == FieldKind.nonEmptyString && spec.required && (value is! String || value.trim().isEmpty)) {
-    issues.add(Issue(nodeId: node.id, path: spec.key, message: 'Required field must not be blank'));
-    return;
-  }
-
   if (value == null) {
+    if (spec.required) {
+      issues.add(Issue(nodeId: node.id, path: spec.key, message: 'Required field is missing'));
+    }
     return;
   }
 
-  if (spec.kind == FieldKind.integer && value is int) {
-    if (spec.min != null && value < spec.min!) {
+  if (!_hasExpectedType(value, spec.kind)) {
+    issues.add(Issue(nodeId: node.id, path: spec.key, message: 'Value has the wrong type'));
+    return;
+  }
+
+  if (spec.kind == FieldKind.nonEmptyString && (value as String).trim().isEmpty) {
+    issues.add(Issue(nodeId: node.id, path: spec.key, message: 'Required field must not be blank'));
+  }
+
+  if (spec.kind == FieldKind.integer) {
+    final integer = value as int;
+    if (spec.min != null && integer < spec.min!) {
       issues.add(Issue(nodeId: node.id, path: spec.key, message: 'Value must be at least ${spec.min}'));
-    } else if (spec.max != null && value > spec.max!) {
+    } else if (spec.max != null && integer > spec.max!) {
       issues.add(Issue(nodeId: node.id, path: spec.key, message: 'Value must be at most ${spec.max}'));
     }
   }
@@ -75,6 +83,17 @@ void _validateField(Node node, FieldSpec spec, List<Issue> issues) {
   }
 }
 
+bool _hasExpectedType(Object value, FieldKind kind) {
+  return switch (kind) {
+    FieldKind.string || FieldKind.nonEmptyString || FieldKind.enumeration || FieldKind.color => value is String,
+    FieldKind.boolean => value is bool,
+    FieldKind.integer => value is int,
+    FieldKind.stringMap =>
+      value is Map && value.keys.every((key) => key is String) && value.values.every((item) => item is String),
+    FieldKind.stringList => value is List && value.every((item) => item is String),
+  };
+}
+
 void _validateSlot(Node node, SlotSpec spec, List<Node> children, List<Issue> issues) {
   final invalidCardinality = switch (spec.cardinality) {
     SlotCardinality.one => children.length != 1,
@@ -84,5 +103,13 @@ void _validateSlot(Node node, SlotSpec spec, List<Node> children, List<Issue> is
 
   if (invalidCardinality) {
     issues.add(Issue(nodeId: node.id, path: spec.key, message: 'Slot has invalid cardinality'));
+  }
+
+  for (final child in children) {
+    if (!spec.allowedTypeIds.contains(child.typeId)) {
+      issues.add(
+        Issue(nodeId: node.id, path: spec.key, message: 'Child type ${child.typeId} is not allowed in this slot'),
+      );
+    }
   }
 }

@@ -40,6 +40,22 @@ void main() {
     expect(issues.any((issue) => issue.nodeId == 'source' && issue.path == 'view'), isTrue);
   });
 
+  test('disallowed child does not satisfy geo source rule alternative', () {
+    const source = Node(
+      id: 'source',
+      typeId: TypeIds.geoSource,
+      fields: {'view': ''},
+      childrenBySlot: {
+        'rule': [Node(id: 'not-a-rule', typeId: TypeIds.app)],
+      },
+    );
+
+    final issues = validate(source, Catalog.modulePack());
+
+    expect(issues.any((issue) => issue.nodeId == 'source' && issue.path == 'rule'), isTrue);
+    expect(issues.any((issue) => issue.nodeId == 'source' && issue.path == 'view'), isTrue);
+  });
+
   test('geo rule requiring a value rejects a blank value', () {
     const rule = Node(
       id: 'rule',

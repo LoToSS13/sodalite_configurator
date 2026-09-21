@@ -8,7 +8,7 @@ List<Issue> extraConstraints(Node node, Catalog catalog) {
     case TypeIds.geoSource:
       final view = node.fields['view'];
       final hasView = view is String && view.trim().isNotEmpty;
-      final hasRule = (node.childrenBySlot['rule'] ?? const <Node>[]).isNotEmpty;
+      final hasRule = (node.childrenBySlot['rule'] ?? const <Node>[]).any((child) => child.typeId == TypeIds.geoRule);
       if (!hasView && !hasRule) {
         return [Issue(nodeId: node.id, path: 'view', message: 'A non-empty view or a rule child is required')];
       }
