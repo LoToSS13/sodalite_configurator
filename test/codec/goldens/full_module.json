@@ -1,0 +1,218 @@
+{
+  "slug": "land_v2",
+  "app.json": {
+    "title": "Земля",
+    "subtitle": "Участки"
+  },
+  "base_layer.json": {
+    "geo": {
+      "alias": "land",
+      "name": "Land",
+      "visibilityThreshold": 16,
+      "hasMarkers": true,
+      "showTagInCluster": true,
+      "style": {
+        "color": "#123456",
+        "isDashed": false
+      },
+      "sources": [
+        {
+          "name": "By view",
+          "icon": "apps/land/pin.svg",
+          "view": "land_view"
+        },
+        {
+          "name": "By rule",
+          "rule": {
+            "operator": "eq",
+            "property": "kind",
+            "value": "parcel"
+          }
+        }
+      ]
+    },
+    "info": {
+      "alias": "parcel",
+      "paths": {
+        "Name": "name",
+        "Image_Main": "photo",
+        "Attachments_Docs": "documents",
+        "Parcel": "parcel"
+      },
+      "title": {
+        "content": "{Name}"
+      },
+      "subtitle": {
+        "content": "Details"
+      },
+      "status": {
+        "content": "{Name}"
+      },
+      "additionalTitle": "Extra",
+      "infoSections": [
+        {
+          "title": "General",
+          "fields": [
+            {
+              "name": "Owner",
+              "content": "{Name}",
+              "separator": ", ",
+              "url": "/owners/{Name}",
+              "ifTrue": "Yes",
+              "ifFalse": "No"
+            }
+          ]
+        }
+      ],
+      "images": [
+        {
+          "title": "Photos",
+          "sources": ["Image_Main"]
+        }
+      ],
+      "attachments": [
+        {
+          "title": "Files",
+          "sources": ["Attachments_Docs"],
+          "extensions": ["pdf", "docx"]
+        }
+      ],
+      "inspectionView": [
+        {
+          "tabName": "Осмотр",
+          "processName": "inspection",
+          "objects": {
+            "Parcel": {
+              "endpoints": {
+                "Name": "name",
+                "Image": "photo",
+                "Files": "files"
+              },
+              "title": {
+                "content": "{Name}"
+              },
+              "subtitle": {
+                "content": "Объект {Name}"
+              },
+              "tag": {
+                "color": "#123456",
+                "content": "{Name}",
+                "ifTrue": "Да"
+              },
+              "fields": [
+                {
+                  "name": "Название",
+                  "content": "{Name}",
+                  "url": "/objects/{Name}"
+                }
+              ],
+              "images": {
+                "source": "Image"
+              },
+              "attachments": {
+                "source": "Files",
+                "extensions": ["pdf"]
+              }
+            }
+          },
+          "creation": {
+            "title": "Создать осмотр",
+            "xsdPath": "xsd/inspection",
+            "relateToObjectKey": "Parcel",
+            "condition": "{Name}",
+            "requireDateWatermark": true,
+            "saveToGallery": false
+          }
+        }
+      ],
+      "actions": [
+        {
+          "type": "informationChange",
+          "xsdPath": "xsd/information"
+        },
+        {
+          "type": "geometryChange",
+          "xsdPath": "xsd/geometry",
+          "geometryTypes": ["point", "line", "polygon"]
+        }
+      ]
+    }
+  },
+  "additional_layers.json": [
+    {
+      "geo": {
+        "alias": "cadastre",
+        "hasMarkers": false,
+        "showTagInCluster": false,
+        "sources": [
+          {
+            "view": "cadastre_view"
+          }
+        ]
+      }
+    }
+  ],
+  "object_creation.json": {
+    "xsdPath": "apps/land/create.xsd",
+    "geometryTypes": [
+      {
+        "type": "point",
+        "autoMode": true
+      },
+      {
+        "type": "line"
+      }
+    ],
+    "requireDateWatermark": true,
+    "saveToGallery": false,
+    "style": {
+      "color": "#112233",
+      "iconPath": "apps/land/a.svg"
+    }
+  },
+  "search.json": {
+    "placeholder": "Найти",
+    "searchObjects": [
+      {
+        "alias": "Parcel",
+        "objectKeyFieldPath": "KeyField",
+        "paths": {
+          "Name": "name"
+        },
+        "attribute": "Name",
+        "resultView": {
+          "title": "Parcel {Name}",
+          "subtitle1": "Code"
+        },
+        "alternativePositionObject": {
+          "jetAlias": "jet",
+          "keyField": "KeyField"
+        },
+        "filter": {
+          "operator": "and",
+          "criterions": [
+            {
+              "operator": "eq",
+              "alias": "Status",
+              "value": "active"
+            },
+            {
+              "operator": "or",
+              "criterions": [
+                {
+                  "operator": "in",
+                  "alias": "Type",
+                  "value": ["a", "b"]
+                },
+                {
+                  "operator": "empty",
+                  "alias": "Deleted"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
