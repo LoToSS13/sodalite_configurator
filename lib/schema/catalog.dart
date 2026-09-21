@@ -48,7 +48,7 @@ class Catalog {
         labelRu: 'Слой',
         slots: [
           SlotSpec(key: 'geo', cardinality: SlotCardinality.one, allowedTypeIds: [TypeIds.geo], required: true),
-          SlotSpec(key: 'info', cardinality: SlotCardinality.optionalOne, allowedTypeIds: ['info']),
+          SlotSpec(key: 'info', cardinality: SlotCardinality.optionalOne, allowedTypeIds: [TypeIds.info]),
         ],
       ),
       TypeIds.geo: const NodeType(
@@ -101,10 +101,66 @@ class Catalog {
           FieldSpec(key: 'value', kind: FieldKind.string),
         ],
       ),
-      'info': const NodeType(
-        id: 'info',
+      TypeIds.info: const NodeType(
+        id: TypeIds.info,
         labelRu: 'Информация',
-        fields: [FieldSpec(key: 'alias', kind: FieldKind.nonEmptyString, required: true)],
+        fields: [
+          FieldSpec(key: 'alias', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'paths', kind: FieldKind.stringMap),
+          FieldSpec(key: 'titleContent', kind: FieldKind.string),
+          FieldSpec(key: 'subtitleContent', kind: FieldKind.string),
+          FieldSpec(key: 'statusContent', kind: FieldKind.string),
+          FieldSpec(key: 'additionalTitle', kind: FieldKind.string),
+        ],
+        slots: [
+          SlotSpec(key: 'infoSections', cardinality: SlotCardinality.list, allowedTypeIds: [TypeIds.infoSection]),
+          SlotSpec(key: 'images', cardinality: SlotCardinality.list, allowedTypeIds: [TypeIds.imageSection]),
+          SlotSpec(key: 'attachments', cardinality: SlotCardinality.list, allowedTypeIds: [TypeIds.attachmentSection]),
+          SlotSpec(key: 'inspectionView', cardinality: SlotCardinality.list, allowedTypeIds: []),
+          SlotSpec(key: 'actions', cardinality: SlotCardinality.list, allowedTypeIds: []),
+        ],
+      ),
+      TypeIds.infoSection: const NodeType(
+        id: TypeIds.infoSection,
+        labelRu: 'Раздел информации',
+        fields: [FieldSpec(key: 'title', kind: FieldKind.string)],
+        slots: [
+          SlotSpec(
+            key: 'fields',
+            cardinality: SlotCardinality.list,
+            allowedTypeIds: [TypeIds.fieldRow],
+            required: true,
+          ),
+        ],
+      ),
+      TypeIds.fieldRow: const NodeType(
+        id: TypeIds.fieldRow,
+        labelRu: 'Строка поля',
+        fields: [
+          FieldSpec(key: 'name', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'content', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'separator', kind: FieldKind.string),
+          FieldSpec(key: 'url', kind: FieldKind.string),
+          FieldSpec(key: 'ifTrue', kind: FieldKind.string),
+          FieldSpec(key: 'ifFalse', kind: FieldKind.string),
+        ],
+      ),
+      TypeIds.imageSection: const NodeType(
+        id: TypeIds.imageSection,
+        labelRu: 'Изображения',
+        fields: [
+          FieldSpec(key: 'title', kind: FieldKind.string),
+          FieldSpec(key: 'sources', kind: FieldKind.stringList, required: true),
+        ],
+      ),
+      TypeIds.attachmentSection: const NodeType(
+        id: TypeIds.attachmentSection,
+        labelRu: 'Вложения',
+        fields: [
+          FieldSpec(key: 'title', kind: FieldKind.string),
+          FieldSpec(key: 'sources', kind: FieldKind.stringList, required: true),
+          FieldSpec(key: 'extensions', kind: FieldKind.stringList),
+        ],
       ),
       'objectCreation': const NodeType(
         id: 'objectCreation',

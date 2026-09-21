@@ -9,7 +9,7 @@ Map<String, dynamic> encodeLayer(Node layer) {
   final encoded = <String, dynamic>{'geo': _encodeGeo(geo)};
   final info = _firstChild(layer, 'info');
   if (info != null) {
-    encoded['info'] = {'alias': info.fields['alias'] ?? ''};
+    encoded['info'] = _encodeInfo(info);
   }
   return encoded;
 }
@@ -31,13 +31,296 @@ Map<String, dynamic> encodeLayer(Node layer) {
 
   if (layerJson.containsKey('info')) {
     final infoJson = _asMap(layerJson['info']) ?? const <String, dynamic>{};
-    _warnUnknown(infoJson, const {'alias'}, r'$.info', warnings);
-    children['info'] = [
-      Node(id: '$id-info', typeId: 'info', fields: {'alias': infoJson['alias'] ?? ''}),
-    ];
+    children['info'] = [_decodeInfo(infoJson, id: '$id-info', warnings: warnings)];
   }
 
   return (layer: Node(id: id, typeId: TypeIds.layer, childrenBySlot: children), warnings: warnings);
+}
+
+Map<String, dynamic> _encodeInfo(Node info) {
+  final fields = info.fields;
+  final encoded = <String, dynamic>{'alias': fields['alias'] ?? ''};
+  final paths = fields['paths'];
+  if (paths is Map && paths.isNotEmpty) {
+    encoded['paths'] = paths;
+  }
+
+  final titleContent = fields['titleContent'];
+  if (titleContent is String && titleContent.isNotEmpty) {
+    encoded['title'] = {'content': titleContent};
+  }
+  if (fields.containsKey('subtitleContent')) {
+    encoded['subtitle'] = {'content': fields['subtitleContent'] ?? ''};
+  }
+  if (fields.containsKey('statusContent')) {
+    encoded['status'] = {'content': fields['statusContent'] ?? ''};
+  }
+  if (fields.containsKey('additionalTitle')) {
+    encoded['additionalTitle'] = fields['additionalTitle'];
+  }
+
+  _encodeChildren(info, 'infoSections', encoded, _encodeInfoSection);
+  _encodeChildren(info, 'images', encoded, _encodeImageSection);
+  _encodeChildren(info, 'attachments', encoded, _encodeAttachmentSection);
+  return encoded;
+}
+
+void _encodeChildren(
+  Node parent,
+  String slot,
+  Map<String, dynamic> encoded,
+  Map<String, dynamic> Function(Node) encode,
+) {
+  final children = parent.childrenBySlot[slot] ?? const <Node>[];
+  if (children.isNotEmpty) {
+    encoded[slot] = children.map(encode).toList();
+  }
+}
+
+Map<String, dynamic> _encodeInfoSection(Node section) {
+  final encoded = <String, dynamic>{};
+  if (section.fields.containsKey('title')) {
+    encoded['title'] = section.fields['title'];
+  }
+  encoded['fields'] = (section.childrenBySlot['fields'] ?? const <Node>[]).map(_encodeFieldRow).toList();
+  return encoded;
+}
+
+Map<String, dynamic> _encodeFieldRow(Node field) {
+  final encoded = <String, dynamic>{'name': field.fields['name'] ?? '', 'content': field.fields['content'] ?? ''};
+  for (final key in const ['separator', 'url', 'ifTrue', 'ifFalse']) {
+    if (field.fields.containsKey(key)) {
+      encoded[key] = field.fields[key];
+    }
+  }
+  return encoded;
+}
+
+Map<String, dynamic> _encodeImageSection(Node section) {
+  final encoded = <String, dynamic>{};
+  if (section.fields.containsKey('title')) {
+    encoded['title'] = section.fields['title'];
+  }
+  encoded['sources'] = section.fields['sources'] ?? const <String>[];
+  return encoded;
+}
+
+Map<String, dynamic> _encodeAttachmentSection(Node section) {
+  final encoded = _encodeImageSection(section);
+  if (section.fields.containsKey('extensions')) {
+    encoded['extensions'] = section.fields['extensions'];
+  }
+  return encoded;
+}
+
+Node _decodeInfo(Map<String, dynamic> json, {required String id, required List<ImportWarning> warnings}) {
+  _warnUnknown(
+    json,
+    const {
+      'alias',
+      'paths',
+      'title',
+      'subtitle',
+      'status',
+      'additionalTitle',
+      'infoSections',
+      'images',
+      'attachments',
+      'fields',
+      'preview',
+      'acceptance',
+    },
+    r'$.info',
+    warnings,
+  );
+
+  final fields = <String, Object?>{'alias': json['alias'] ?? ''};
+  if (json.containsKey('paths')) {
+    fields['paths'] = json['paths'];
+  }
+  _decodeContentField(json, 'title', 'titleContent', fields);
+  _decodeContentField(json, 'subtitle', 'subtitleContent', fields);
+  _decodeContentField(json, 'status', 'statusContent', fields);
+  if (json.containsKey('additionalTitle')) {
+    fields['additionalTitle'] = json['additionalTitle'];
+  }
+
+  final children = <String, List<Node>>{};
+  final sections = _decodeInfoSections(json['infoSections'], id: id, warnings: warnings);
+  if (json.containsKey('fields')) {
+    final legacyFields = _decodeFieldRows(
+      json['fields'],
+      id: '$id-legacy-section',
+      path: r'$.info.fields',
+      warnings: warnings,
+    );
+    sections.insert(
+      0,
+      Node(
+        id: '$id-legacy-section',
+        typeId: TypeIds.infoSection,
+        fields: const {'title': ''},
+        childrenBySlot: {'fields': legacyFields},
+      ),
+    );
+    warnings.add(const ImportWarning(file: 'layer.json', message: 'legacy fields converted'));
+  }
+  if (sections.isNotEmpty) {
+    children['infoSections'] = sections;
+  }
+
+  final images = _decodeMediaSections(
+    json['images'],
+    id: '$id-images',
+    typeId: TypeIds.imageSection,
+    path: r'$.info.images',
+    warnings: warnings,
+  );
+  if (images.isNotEmpty) {
+    children['images'] = images;
+  }
+  final attachments = _decodeMediaSections(
+    json['attachments'],
+    id: '$id-attachments',
+    typeId: TypeIds.attachmentSection,
+    path: r'$.info.attachments',
+    warnings: warnings,
+  );
+  if (attachments.isNotEmpty) {
+    children['attachments'] = attachments;
+  }
+
+  if (json.containsKey('preview')) {
+    warnings.add(const ImportWarning(file: 'layer.json', message: 'preview dropped'));
+  }
+  if (json.containsKey('acceptance')) {
+    warnings.add(const ImportWarning(file: 'layer.json', message: 'acceptance dropped'));
+  }
+
+  return Node(id: id, typeId: TypeIds.info, fields: fields, childrenBySlot: children);
+}
+
+void _decodeContentField(Map<String, dynamic> json, String jsonKey, String fieldKey, Map<String, Object?> fields) {
+  if (!json.containsKey(jsonKey)) {
+    return;
+  }
+  final content = _asMap(json[jsonKey]);
+  fields[fieldKey] = content?['content'] ?? '';
+}
+
+List<Node> _decodeInfoSections(Object? value, {required String id, required List<ImportWarning> warnings}) {
+  if (value is! List) {
+    return [];
+  }
+  return [
+    for (var index = 0; index < value.length; index++)
+      _decodeInfoSection(
+        _asMap(value[index]) ?? const <String, dynamic>{},
+        id: '$id-section-$index',
+        path:
+            r'$.info.infoSections['
+            '$index]',
+        warnings: warnings,
+      ),
+  ];
+}
+
+Node _decodeInfoSection(
+  Map<String, dynamic> json, {
+  required String id,
+  required String path,
+  required List<ImportWarning> warnings,
+}) {
+  _warnUnknown(json, const {'title', 'fields'}, path, warnings);
+  final fields = <String, Object?>{};
+  if (json.containsKey('title')) {
+    fields['title'] = json['title'];
+  }
+  return Node(
+    id: id,
+    typeId: TypeIds.infoSection,
+    fields: fields,
+    childrenBySlot: {'fields': _decodeFieldRows(json['fields'], id: id, path: '$path.fields', warnings: warnings)},
+  );
+}
+
+List<Node> _decodeFieldRows(
+  Object? value, {
+  required String id,
+  required String path,
+  required List<ImportWarning> warnings,
+}) {
+  if (value is! List) {
+    return [];
+  }
+  return [
+    for (var index = 0; index < value.length; index++)
+      _decodeFieldRow(
+        _asMap(value[index]) ?? const <String, dynamic>{},
+        id: '$id-field-$index',
+        path: '$path[$index]',
+        warnings: warnings,
+      ),
+  ];
+}
+
+Node _decodeFieldRow(
+  Map<String, dynamic> json, {
+  required String id,
+  required String path,
+  required List<ImportWarning> warnings,
+}) {
+  _warnUnknown(json, const {'name', 'content', 'separator', 'url', 'ifTrue', 'ifFalse'}, path, warnings);
+  final fields = <String, Object?>{'name': json['name'] ?? '', 'content': json['content'] ?? ''};
+  for (final key in const ['separator', 'url', 'ifTrue', 'ifFalse']) {
+    if (json.containsKey(key)) {
+      fields[key] = json[key];
+    }
+  }
+  return Node(id: id, typeId: TypeIds.fieldRow, fields: fields);
+}
+
+List<Node> _decodeMediaSections(
+  Object? value, {
+  required String id,
+  required String typeId,
+  required String path,
+  required List<ImportWarning> warnings,
+}) {
+  if (value is! List) {
+    return [];
+  }
+  return [
+    for (var index = 0; index < value.length; index++)
+      _decodeMediaSection(
+        _asMap(value[index]) ?? const <String, dynamic>{},
+        id: '$id-$index',
+        typeId: typeId,
+        path: '$path[$index]',
+        warnings: warnings,
+      ),
+  ];
+}
+
+Node _decodeMediaSection(
+  Map<String, dynamic> json, {
+  required String id,
+  required String typeId,
+  required String path,
+  required List<ImportWarning> warnings,
+}) {
+  final known = typeId == TypeIds.attachmentSection
+      ? const {'title', 'sources', 'extensions'}
+      : const {'title', 'sources'};
+  _warnUnknown(json, known, path, warnings);
+  final fields = <String, Object?>{'sources': json['sources'] ?? const <String>[]};
+  if (json.containsKey('title')) {
+    fields['title'] = json['title'];
+  }
+  if (typeId == TypeIds.attachmentSection && json.containsKey('extensions')) {
+    fields['extensions'] = json['extensions'];
+  }
+  return Node(id: id, typeId: typeId, fields: fields);
 }
 
 Map<String, dynamic> _encodeGeo(Node? geo) {
