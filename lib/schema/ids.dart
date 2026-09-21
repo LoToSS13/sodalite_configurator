@@ -11,4 +11,10 @@ abstract final class TypeIds {
   static const fieldRow = 'fieldRow';
   static const imageSection = 'imageSection';
   static const attachmentSection = 'attachmentSection';
+  static const inspectionTab = 'inspectionTab';
+  static const inspectionObject = 'inspectionObject';
+  static const inspectionCreation = 'inspectionCreation';
+  static const actionInformationChange = 'actionInformationChange';
+  static const actionGeometryChange = 'actionGeometryChange';
+  static const actionUnknown = 'actionUnknown';
 }

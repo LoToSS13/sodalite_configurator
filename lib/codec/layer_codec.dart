@@ -62,6 +62,8 @@ Map<String, dynamic> _encodeInfo(Node info) {
   _encodeChildren(info, 'infoSections', encoded, _encodeInfoSection);
   _encodeChildren(info, 'images', encoded, _encodeImageSection);
   _encodeChildren(info, 'attachments', encoded, _encodeAttachmentSection);
+  _encodeChildren(info, 'inspectionView', encoded, _encodeInspectionTab);
+  _encodeChildren(info, 'actions', encoded, _encodeAction);
   return encoded;
 }
 
@@ -113,6 +115,89 @@ Map<String, dynamic> _encodeAttachmentSection(Node section) {
   return encoded;
 }
 
+Map<String, dynamic> _encodeInspectionTab(Node tab) {
+  final encoded = <String, dynamic>{};
+  for (final key in const ['tabName', 'processName']) {
+    if (tab.fields.containsKey(key)) {
+      encoded[key] = tab.fields[key];
+    }
+  }
+  encoded['objects'] = {
+    for (final object in tab.childrenBySlot['objects'] ?? const <Node>[])
+      object.fields['pathKey'] ?? '': _encodeInspectionObject(object),
+  };
+  final creation = _firstChild(tab, 'creation');
+  if (creation != null) {
+    encoded['creation'] = _encodeInspectionCreation(creation);
+  }
+  return encoded;
+}
+
+Map<String, dynamic> _encodeInspectionObject(Node object) {
+  final fields = object.fields;
+  final encoded = <String, dynamic>{
+    'endpoints': fields['endpoints'] ?? const <String, String>{},
+    'title': {'content': fields['titleContent'] ?? ''},
+  };
+  if (fields.containsKey('subtitleContent')) {
+    encoded['subtitle'] = {'content': fields['subtitleContent']};
+  }
+
+  final tag = <String, dynamic>{};
+  for (final entry in const {'tagColor': 'color', 'tagContent': 'content', 'tagIfTrue': 'ifTrue'}.entries) {
+    if (fields.containsKey(entry.key)) {
+      tag[entry.value] = fields[entry.key];
+    }
+  }
+  if (tag.isNotEmpty) {
+    encoded['tag'] = tag;
+  }
+
+  _encodeChildren(object, 'fields', encoded, _encodeFieldRow);
+  if (fields.containsKey('imagesSource')) {
+    encoded['images'] = {'source': fields['imagesSource']};
+  }
+  if (fields.containsKey('attachmentsSource')) {
+    final attachments = <String, dynamic>{'source': fields['attachmentsSource']};
+    if (fields.containsKey('extensions')) {
+      attachments['extensions'] = fields['extensions'];
+    }
+    encoded['attachments'] = attachments;
+  }
+  return encoded;
+}
+
+Map<String, dynamic> _encodeInspectionCreation(Node creation) {
+  final fields = creation.fields;
+  final encoded = <String, dynamic>{
+    'title': fields['title'] ?? '',
+    'xsdPath': fields['xsdPath'] ?? '',
+    'relateToObjectKey': fields['relateToObjectKey'] ?? '',
+  };
+  if (fields.containsKey('condition')) {
+    encoded['condition'] = fields['condition'];
+  }
+  encoded['requireDateWatermark'] = fields['requireDateWatermark'] ?? true;
+  encoded['saveToGallery'] = fields['saveToGallery'] ?? false;
+  return encoded;
+}
+
+Map<String, dynamic> _encodeAction(Node action) {
+  final encoded = <String, dynamic>{};
+  switch (action.typeId) {
+    case TypeIds.actionInformationChange:
+      encoded['type'] = 'informationChange';
+      encoded['xsdPath'] = action.fields['xsdPath'] ?? '';
+    case TypeIds.actionGeometryChange:
+      encoded['type'] = 'geometryChange';
+      encoded['xsdPath'] = action.fields['xsdPath'] ?? '';
+      encoded['geometryTypes'] = action.fields['geometryTypes'] ?? const <String>[];
+    case TypeIds.actionUnknown:
+      encoded['type'] = action.fields['rawType'] ?? '';
+  }
+  return encoded;
+}
+
 Node _decodeInfo(Map<String, dynamic> json, {required String id, required List<ImportWarning> warnings}) {
   _warnUnknown(
     json,
@@ -126,6 +211,8 @@ Node _decodeInfo(Map<String, dynamic> json, {required String id, required List<I
       'infoSections',
       'images',
       'attachments',
+      'inspectionView',
+      'actions',
       'fields',
       'preview',
       'acceptance',
@@ -195,6 +282,14 @@ Node _decodeInfo(Map<String, dynamic> json, {required String id, required List<I
   );
   if (attachments.isNotEmpty) {
     children['attachments'] = attachments;
+  }
+  final inspectionView = _decodeInspectionView(json['inspectionView'], id: id, warnings: warnings);
+  if (inspectionView.isNotEmpty) {
+    children['inspectionView'] = inspectionView;
+  }
+  final actions = _decodeActions(json['actions'], id: id, warnings: warnings);
+  if (actions.isNotEmpty) {
+    children['actions'] = actions;
   }
   if (invalidMediaCollections.isNotEmpty) {
     fields['_invalidMediaCollections'] = invalidMediaCollections;
@@ -351,6 +446,190 @@ Node _decodeMediaSection(
     fields['extensions'] = json['extensions'];
   }
   return Node(id: id, typeId: typeId, fields: fields);
+}
+
+List<Node> _decodeInspectionView(Object? value, {required String id, required List<ImportWarning> warnings}) {
+  if (value is! List) {
+    return [];
+  }
+  return [
+    for (var index = 0; index < value.length; index++)
+      _decodeInspectionTab(
+        _asMap(value[index]) ?? const <String, dynamic>{},
+        id: '$id-inspection-$index',
+        path:
+            r'$.info.inspectionView['
+            '$index]',
+        warnings: warnings,
+      ),
+  ];
+}
+
+Node _decodeInspectionTab(
+  Map<String, dynamic> json, {
+  required String id,
+  required String path,
+  required List<ImportWarning> warnings,
+}) {
+  _warnUnknown(json, const {'tabName', 'processName', 'objects', 'creation'}, path, warnings);
+  final fields = <String, Object?>{};
+  for (final key in const ['tabName', 'processName']) {
+    if (json.containsKey(key)) {
+      fields[key] = json[key];
+    }
+  }
+
+  final children = <String, List<Node>>{};
+  final objectsJson = _asMap(json['objects']);
+  if (objectsJson != null) {
+    final entries = objectsJson.entries.toList();
+    children['objects'] = [
+      for (var index = 0; index < entries.length; index++)
+        _decodeInspectionObject(
+          _asMap(entries[index].value) ?? const <String, dynamic>{},
+          id: '$id-object-$index',
+          pathKey: entries[index].key,
+          path: '$path.objects.${entries[index].key}',
+          warnings: warnings,
+        ),
+    ];
+  }
+  if (json.containsKey('creation')) {
+    children['creation'] = [
+      _decodeInspectionCreation(
+        _asMap(json['creation']) ?? const <String, dynamic>{},
+        id: '$id-creation',
+        path: '$path.creation',
+        warnings: warnings,
+      ),
+    ];
+  }
+  return Node(id: id, typeId: TypeIds.inspectionTab, fields: fields, childrenBySlot: children);
+}
+
+Node _decodeInspectionObject(
+  Map<String, dynamic> json, {
+  required String id,
+  required String pathKey,
+  required String path,
+  required List<ImportWarning> warnings,
+}) {
+  _warnUnknown(
+    json,
+    const {'endpoints', 'title', 'subtitle', 'tag', 'fields', 'images', 'attachments'},
+    path,
+    warnings,
+  );
+  final fields = <String, Object?>{
+    'pathKey': pathKey,
+    'endpoints': json['endpoints'] ?? const <String, String>{},
+    'titleContent': _asMap(json['title'])?['content'] ?? '',
+  };
+  if (json.containsKey('subtitle')) {
+    fields['subtitleContent'] = _asMap(json['subtitle'])?['content'] ?? '';
+  }
+
+  final tag = _asMap(json['tag']);
+  if (tag != null) {
+    for (final entry in const {'color': 'tagColor', 'content': 'tagContent', 'ifTrue': 'tagIfTrue'}.entries) {
+      if (tag.containsKey(entry.key)) {
+        fields[entry.value] = tag[entry.key];
+      }
+    }
+  }
+  final images = _asMap(json['images']);
+  if (images != null && images.containsKey('source')) {
+    fields['imagesSource'] = images['source'];
+  }
+  final attachments = _asMap(json['attachments']);
+  if (attachments != null) {
+    if (attachments.containsKey('source')) {
+      fields['attachmentsSource'] = attachments['source'];
+    }
+    if (attachments.containsKey('extensions')) {
+      fields['extensions'] = attachments['extensions'];
+    }
+  }
+
+  final children = <String, List<Node>>{};
+  final fieldRows = _decodeFieldRows(json['fields'], id: id, path: '$path.fields', warnings: warnings);
+  if (fieldRows.isNotEmpty) {
+    children['fields'] = fieldRows;
+  }
+  return Node(id: id, typeId: TypeIds.inspectionObject, fields: fields, childrenBySlot: children);
+}
+
+Node _decodeInspectionCreation(
+  Map<String, dynamic> json, {
+  required String id,
+  required String path,
+  required List<ImportWarning> warnings,
+}) {
+  _warnUnknown(
+    json,
+    const {'title', 'xsdPath', 'relateToObjectKey', 'condition', 'requireDateWatermark', 'saveToGallery'},
+    path,
+    warnings,
+  );
+  final fields = <String, Object?>{
+    'title': json['title'] ?? '',
+    'xsdPath': json['xsdPath'] ?? '',
+    'relateToObjectKey': json['relateToObjectKey'] ?? '',
+    'requireDateWatermark': json['requireDateWatermark'] ?? true,
+    'saveToGallery': json['saveToGallery'] ?? false,
+  };
+  if (json.containsKey('condition')) {
+    fields['condition'] = json['condition'];
+  }
+  return Node(id: id, typeId: TypeIds.inspectionCreation, fields: fields);
+}
+
+List<Node> _decodeActions(Object? value, {required String id, required List<ImportWarning> warnings}) {
+  if (value is! List) {
+    return [];
+  }
+  return [
+    for (var index = 0; index < value.length; index++)
+      _decodeAction(
+        _asMap(value[index]) ?? const <String, dynamic>{},
+        id: '$id-action-$index',
+        path:
+            r'$.info.actions['
+            '$index]',
+        warnings: warnings,
+      ),
+  ];
+}
+
+Node _decodeAction(
+  Map<String, dynamic> json, {
+  required String id,
+  required String path,
+  required List<ImportWarning> warnings,
+}) {
+  final rawType = json['type'];
+  switch (rawType) {
+    case 'informationChange':
+      _warnUnknown(json, const {'type', 'xsdPath'}, path, warnings);
+      return Node(id: id, typeId: TypeIds.actionInformationChange, fields: {'xsdPath': json['xsdPath'] ?? ''});
+    case 'geometryChange':
+      _warnUnknown(json, const {'type', 'xsdPath', 'geometryTypes'}, path, warnings);
+      return Node(
+        id: id,
+        typeId: TypeIds.actionGeometryChange,
+        fields: {'xsdPath': json['xsdPath'] ?? '', 'geometryTypes': json['geometryTypes'] ?? const <String>[]},
+      );
+    default:
+      _warnUnknown(json, const {'type'}, path, warnings);
+      final typeName = rawType is String ? rawType : '';
+      warnings.add(
+        ImportWarning(
+          file: 'layer.json',
+          message: 'Unknown action type "$typeName" was imported as an invalid action.',
+        ),
+      );
+      return Node(id: id, typeId: TypeIds.actionUnknown, fields: {'rawType': typeName});
+  }
 }
 
 Map<String, dynamic> _encodeGeo(Node? geo) {

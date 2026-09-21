@@ -116,8 +116,12 @@ class Catalog {
           SlotSpec(key: 'infoSections', cardinality: SlotCardinality.list, allowedTypeIds: [TypeIds.infoSection]),
           SlotSpec(key: 'images', cardinality: SlotCardinality.list, allowedTypeIds: [TypeIds.imageSection]),
           SlotSpec(key: 'attachments', cardinality: SlotCardinality.list, allowedTypeIds: [TypeIds.attachmentSection]),
-          SlotSpec(key: 'inspectionView', cardinality: SlotCardinality.list, allowedTypeIds: []),
-          SlotSpec(key: 'actions', cardinality: SlotCardinality.list, allowedTypeIds: []),
+          SlotSpec(key: 'inspectionView', cardinality: SlotCardinality.list, allowedTypeIds: [TypeIds.inspectionTab]),
+          SlotSpec(
+            key: 'actions',
+            cardinality: SlotCardinality.list,
+            allowedTypeIds: [TypeIds.actionInformationChange, TypeIds.actionGeometryChange, TypeIds.actionUnknown],
+          ),
         ],
       ),
       TypeIds.infoSection: const NodeType(
@@ -161,6 +165,76 @@ class Catalog {
           FieldSpec(key: 'sources', kind: FieldKind.stringList, required: true),
           FieldSpec(key: 'extensions', kind: FieldKind.stringList),
         ],
+      ),
+      TypeIds.inspectionTab: const NodeType(
+        id: TypeIds.inspectionTab,
+        labelRu: 'Вкладка инспекции',
+        fields: [
+          FieldSpec(key: 'tabName', kind: FieldKind.string),
+          FieldSpec(key: 'processName', kind: FieldKind.string),
+        ],
+        slots: [
+          SlotSpec(
+            key: 'objects',
+            cardinality: SlotCardinality.list,
+            allowedTypeIds: [TypeIds.inspectionObject],
+            required: true,
+          ),
+          SlotSpec(
+            key: 'creation',
+            cardinality: SlotCardinality.optionalOne,
+            allowedTypeIds: [TypeIds.inspectionCreation],
+          ),
+        ],
+      ),
+      TypeIds.inspectionObject: const NodeType(
+        id: TypeIds.inspectionObject,
+        labelRu: 'Объект инспекции',
+        fields: [
+          FieldSpec(key: 'pathKey', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'endpoints', kind: FieldKind.stringMap, required: true),
+          FieldSpec(key: 'titleContent', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'subtitleContent', kind: FieldKind.string),
+          FieldSpec(key: 'tagColor', kind: FieldKind.color),
+          FieldSpec(key: 'tagContent', kind: FieldKind.string),
+          FieldSpec(key: 'tagIfTrue', kind: FieldKind.string),
+          FieldSpec(key: 'imagesSource', kind: FieldKind.string),
+          FieldSpec(key: 'attachmentsSource', kind: FieldKind.string),
+          FieldSpec(key: 'extensions', kind: FieldKind.stringList),
+        ],
+        slots: [
+          SlotSpec(key: 'fields', cardinality: SlotCardinality.list, allowedTypeIds: [TypeIds.fieldRow]),
+        ],
+      ),
+      TypeIds.inspectionCreation: const NodeType(
+        id: TypeIds.inspectionCreation,
+        labelRu: 'Создание при инспекции',
+        fields: [
+          FieldSpec(key: 'title', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'xsdPath', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'relateToObjectKey', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'condition', kind: FieldKind.string),
+          FieldSpec(key: 'requireDateWatermark', kind: FieldKind.boolean, required: true, defaultValue: true),
+          FieldSpec(key: 'saveToGallery', kind: FieldKind.boolean, required: true, defaultValue: false),
+        ],
+      ),
+      TypeIds.actionInformationChange: const NodeType(
+        id: TypeIds.actionInformationChange,
+        labelRu: 'Изменение информации',
+        fields: [FieldSpec(key: 'xsdPath', kind: FieldKind.nonEmptyString, required: true)],
+      ),
+      TypeIds.actionGeometryChange: const NodeType(
+        id: TypeIds.actionGeometryChange,
+        labelRu: 'Изменение геометрии',
+        fields: [
+          FieldSpec(key: 'xsdPath', kind: FieldKind.nonEmptyString, required: true),
+          FieldSpec(key: 'geometryTypes', kind: FieldKind.stringList, required: true),
+        ],
+      ),
+      TypeIds.actionUnknown: const NodeType(
+        id: TypeIds.actionUnknown,
+        labelRu: 'Неизвестное действие',
+        fields: [FieldSpec(key: 'rawType', kind: FieldKind.string, required: true)],
       ),
       'objectCreation': const NodeType(
         id: 'objectCreation',

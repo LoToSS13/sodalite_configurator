@@ -27,6 +27,12 @@ List<Issue> extraConstraints(Node node, Catalog catalog) {
       return _validateNonEmptySources(node);
     case TypeIds.attachmentSection:
       return [..._validateNonEmptySources(node), ..._validateExtensions(node)];
+    case TypeIds.inspectionObject:
+      return [..._validateInspectionObject(node), ..._validateExtensions(node)];
+    case TypeIds.actionGeometryChange:
+      return _validateGeometryTypes(node);
+    case TypeIds.actionUnknown:
+      return [Issue(nodeId: node.id, path: 'rawType', message: 'Unknown action type must be deleted')];
   }
 
   return const [];
@@ -67,8 +73,63 @@ List<Issue> _validateInfo(Node info) {
   for (final attachments in info.childrenBySlot['attachments'] ?? const <Node>[]) {
     _validateMediaSources(attachments, pathKeys, 'Attachments_', issues);
   }
+  for (final tab in info.childrenBySlot['inspectionView'] ?? const <Node>[]) {
+    for (final object in tab.childrenBySlot['objects'] ?? const <Node>[]) {
+      final pathKey = object.fields['pathKey'];
+      if (pathKey is String && !pathKeys.contains(pathKey)) {
+        issues.add(
+          Issue(nodeId: object.id, path: 'pathKey', message: 'Path key "$pathKey" is not defined in info.paths'),
+        );
+      }
+    }
+  }
 
   return issues;
+}
+
+List<Issue> _validateInspectionObject(Node object) {
+  final issues = <Issue>[];
+  final endpoints = object.fields['endpoints'];
+  final endpointKeys = endpoints is Map ? endpoints.keys.whereType<String>().toSet() : const <String>{};
+  if (endpoints is Map && endpoints.isEmpty) {
+    issues.add(Issue(nodeId: object.id, path: 'endpoints', message: 'At least one endpoint is required'));
+  }
+
+  for (final key in const ['titleContent', 'subtitleContent', 'tagContent']) {
+    _validateObjectPlaceholders(object, key, endpointKeys, issues);
+  }
+  for (final field in object.childrenBySlot['fields'] ?? const <Node>[]) {
+    _validateObjectPlaceholders(field, 'content', endpointKeys, issues);
+    _validateObjectPlaceholders(field, 'url', endpointKeys, issues);
+  }
+  return issues;
+}
+
+void _validateObjectPlaceholders(Node node, String field, Set<String> endpointKeys, List<Issue> issues) {
+  final value = node.fields[field];
+  if (value is! String) {
+    return;
+  }
+  for (final placeholder in extractPlaceholders(value).toSet()) {
+    if (!endpointKeys.contains(placeholder)) {
+      issues.add(
+        Issue(nodeId: node.id, path: field, message: 'Placeholder "$placeholder" is not defined in endpoints'),
+      );
+    }
+  }
+}
+
+List<Issue> _validateGeometryTypes(Node action) {
+  final geometryTypes = action.fields['geometryTypes'];
+  if (geometryTypes is! List) {
+    return const [];
+  }
+  if (geometryTypes.isEmpty || geometryTypes.any((type) => !const {'point', 'line', 'polygon'}.contains(type))) {
+    return [
+      Issue(nodeId: action.id, path: 'geometryTypes', message: 'At least one supported geometry type is required'),
+    ];
+  }
+  return const [];
 }
 
 void _validatePlaceholders(Node node, String field, Set<String> pathKeys, List<Issue> issues) {
