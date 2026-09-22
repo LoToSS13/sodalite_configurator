@@ -5,6 +5,7 @@ import 'package:sodalite_configurator/codec/module_codec.dart';
 import 'package:sodalite_configurator/codec/zip_io.dart';
 import 'package:sodalite_configurator/persistence/draft_store.dart';
 import 'package:sodalite_configurator/schema/catalog.dart';
+import 'package:sodalite_configurator/schema/filter_operator.dart';
 import 'package:sodalite_configurator/schema/ids.dart';
 import 'package:sodalite_configurator/schema/issue.dart';
 import 'package:sodalite_configurator/schema/node.dart';
@@ -37,12 +38,15 @@ class DocumentController extends ChangeNotifier {
   List<Issue> _issues = const [];
   Timer? _draftTimer;
   String? _persistedDraftSlug;
+  final List<Node> _undo = [];
+  int _undoEpoch = 0;
 
   Node get root => _root;
   String? get selectedId => _selectedId;
   List<Issue> get issues => _issues;
   bool get canExport => _issues.isEmpty;
   bool get hasImportNotes => importWarnings.isNotEmpty || importErrors.isNotEmpty;
+  int get undoEpoch => _undoEpoch;
 
   void select(String? id) {
     if (_selectedId == id) {
@@ -116,6 +120,93 @@ class DocumentController extends ChangeNotifier {
     }
   }
 
+  void duplicateLayer(String layerId) {
+    final layer = _root.find(layerId);
+    if (layer == null || layer.typeId != TypeIds.layer) {
+      return;
+    }
+    final copy = _cloneNode(layer);
+    final layers = [..._root.childrenBySlot['additionalLayers'] ?? const <Node>[], copy];
+    final changed = _replaceNode(
+      _root,
+      _root.id,
+      (node) => node.copyWith(childrenBySlot: {...node.childrenBySlot, 'additionalLayers': layers}),
+    );
+    if (changed != null) {
+      _commit(changed);
+    }
+  }
+
+  void addFilterCriterion(String parentId, {bool group = false}) {
+    final parent = _root.find(parentId);
+    if (parent == null || parent.typeId != TypeIds.searchFilterGroup) {
+      return;
+    }
+    final child = group
+        ? Node(id: newNodeId(), typeId: TypeIds.searchFilterGroup, fields: const {'operator': 'and'})
+        : Node(
+            id: newNodeId(),
+            typeId: TypeIds.searchFilterScalar,
+            fields: const {'operator': 'eq', 'alias': '', 'value': ''},
+          );
+    final current = parent.childrenBySlot['criterions'] ?? const <Node>[];
+    final changed = _replaceNode(
+      _root,
+      parentId,
+      (node) => node.copyWith(
+        childrenBySlot: {
+          ...node.childrenBySlot,
+          'criterions': [...current, child],
+        },
+      ),
+    );
+    if (changed != null) {
+      _commit(changed);
+    }
+  }
+
+  void setFilterOperator(String nodeId, String operator) {
+    final node = _root.find(nodeId);
+    if (node == null) {
+      return;
+    }
+    final nextType = filterTypeForOperator(operator);
+    final criterions = node.childrenBySlot['criterions'] ?? const <Node>[];
+    if (nextType != TypeIds.searchFilterGroup && criterions.isNotEmpty) {
+      _remember();
+    }
+    final fields = <String, Object?>{'operator': operator};
+    if (nextType != TypeIds.searchFilterGroup) {
+      final alias = node.fields['alias'];
+      fields['alias'] = alias is String ? alias : '';
+    }
+    if (nextType == TypeIds.searchFilterScalar || nextType == TypeIds.searchFilterList) {
+      fields['value'] = _filterValue(node, nextType);
+    }
+    final changed = _replaceNode(
+      _root,
+      nodeId,
+      (current) => Node(
+        id: current.id,
+        typeId: nextType,
+        fields: fields,
+        childrenBySlot: nextType == TypeIds.searchFilterGroup ? current.childrenBySlot : const {},
+      ),
+    );
+    if (changed != null) {
+      _commit(changed);
+    }
+  }
+
+  void undo() {
+    if (_undo.isEmpty) {
+      return;
+    }
+    final previous = _undo.removeLast();
+    _selectedId = null;
+    _commit(previous);
+  }
+
   void addChild({required String parentId, required String slot, required String typeId}) {
     final parent = _root.find(parentId);
     if (parent == null) {
@@ -167,6 +258,7 @@ class DocumentController extends ChangeNotifier {
     if (_selectedId != null && removed.find(_selectedId!) != null) {
       _selectedId = null;
     }
+    _remember();
     _commit(changed);
   }
 
@@ -269,6 +361,62 @@ class DocumentController extends ChangeNotifier {
   void _revalidate() {
     _issues = List<Issue>.unmodifiable(validate(_root, catalog));
   }
+
+  void _remember() {
+    _undo.add(_root);
+    if (_undo.length > 20) {
+      _undo.removeAt(0);
+    }
+    _undoEpoch++;
+  }
+}
+
+Node _cloneNode(Node node) {
+  return Node(
+    id: newNodeId(),
+    typeId: node.typeId,
+    fields: {for (final entry in node.fields.entries) entry.key: _cloneValue(entry.value)},
+    childrenBySlot: {
+      for (final entry in node.childrenBySlot.entries) entry.key: [for (final child in entry.value) _cloneNode(child)],
+    },
+  );
+}
+
+Object? _cloneValue(Object? value) {
+  if (value is Map) {
+    return {for (final entry in value.entries) entry.key: _cloneValue(entry.value)};
+  }
+  if (value is List) {
+    return [for (final item in value) _cloneValue(item)];
+  }
+  return value;
+}
+
+Object _filterValue(Node node, String nextType) {
+  final current = node.fields['value'];
+  if (nextType == TypeIds.searchFilterList) {
+    if (current is List) {
+      return [
+        for (final item in current)
+          if (item is String) item,
+      ];
+    }
+    if (current is String && current.trim().isNotEmpty) {
+      return [current];
+    }
+    return <String>[];
+  }
+  if (current is String) {
+    return current;
+  }
+  if (current is List) {
+    for (final item in current) {
+      if (item is String) {
+        return item;
+      }
+    }
+  }
+  return '';
 }
 
 ({Node parent, String slot, int index})? _locateChild(Node parent, String nodeId) {

@@ -180,6 +180,35 @@ void main() {
     renaming.dispose();
   });
 
+  test('duplicateLayer appends a copy with new ids', () {
+    final layer = controller.root.childrenBySlot['baseLayer']!.single;
+    final geo = layer.childrenBySlot['geo']!.single;
+    controller.setField(geo.id, 'alias', 'base');
+
+    controller.duplicateLayer(layer.id);
+
+    final copies = controller.root.childrenBySlot['additionalLayers']!;
+    expect(copies, hasLength(1));
+    expect(copies.single.id, isNot(layer.id));
+    expect(copies.single.childrenBySlot['geo']!.single.id, isNot(geo.id));
+    expect(copies.single.childrenBySlot['geo']!.single.fields['alias'], 'base');
+    controller.setField(geo.id, 'alias', 'changed');
+    expect(copies.single.childrenBySlot['geo']!.single.fields['alias'], 'base');
+  });
+
+  test('undo restores the tree from before the last removal', () {
+    controller.addChild(parentId: controller.root.id, slot: 'additionalLayers', typeId: TypeIds.layer);
+    final layer = controller.root.childrenBySlot['additionalLayers']!.single;
+    final epoch = controller.undoEpoch;
+
+    controller.removeNode(layer.id);
+
+    expect(controller.root.find(layer.id), isNull);
+    expect(controller.undoEpoch, epoch + 1);
+    controller.undo();
+    expect(controller.root.find(layer.id), isNotNull);
+  });
+
   test('trySetSlug migrates the draft key', () async {
     final storage = <String, String>{};
     final drafts = MemoryDraftStore(storage);

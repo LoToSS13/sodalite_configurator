@@ -301,7 +301,13 @@ class Catalog {
         id: TypeIds.searchFilterGroup,
         labelRu: 'Группа фильтра',
         fields: [
-          FieldSpec(key: 'operator', kind: FieldKind.enumeration, required: true, enumValues: ['and', 'or']),
+          FieldSpec(
+            key: 'operator',
+            kind: FieldKind.enumeration,
+            required: true,
+            enumValues: ['and', 'or'],
+            defaultValue: 'and',
+          ),
         ],
         slots: [
           SlotSpec(
@@ -327,6 +333,7 @@ class Catalog {
             kind: FieldKind.enumeration,
             required: true,
             enumValues: ['eq', 'noteq', 'like', 'notlike', 'gt', 'lt', 'gte', 'lte'],
+            defaultValue: 'eq',
           ),
           FieldSpec(key: 'alias', kind: FieldKind.nonEmptyString, required: true),
           FieldSpec(key: 'value', kind: FieldKind.nonEmptyString, required: true),
@@ -336,7 +343,13 @@ class Catalog {
         id: TypeIds.searchFilterList,
         labelRu: 'Списочный критерий',
         fields: [
-          FieldSpec(key: 'operator', kind: FieldKind.enumeration, required: true, enumValues: ['in', 'notin']),
+          FieldSpec(
+            key: 'operator',
+            kind: FieldKind.enumeration,
+            required: true,
+            enumValues: ['in', 'notin'],
+            defaultValue: 'in',
+          ),
           FieldSpec(key: 'alias', kind: FieldKind.nonEmptyString, required: true),
           FieldSpec(key: 'value', kind: FieldKind.stringList, required: true),
         ],
@@ -345,7 +358,13 @@ class Catalog {
         id: TypeIds.searchFilterEmpty,
         labelRu: 'Критерий пустоты',
         fields: [
-          FieldSpec(key: 'operator', kind: FieldKind.enumeration, required: true, enumValues: ['empty', 'notempty']),
+          FieldSpec(
+            key: 'operator',
+            kind: FieldKind.enumeration,
+            required: true,
+            enumValues: ['empty', 'notempty'],
+            defaultValue: 'empty',
+          ),
           FieldSpec(key: 'alias', kind: FieldKind.nonEmptyString, required: true),
         ],
       ),

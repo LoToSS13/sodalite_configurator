@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:sodalite_configurator/ui/strings.dart';
 
 class JsonPreview extends StatelessWidget {
   const JsonPreview({super.key, required this.text, this.filename});
@@ -13,11 +15,23 @@ class JsonPreview extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (filename != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Text(filename!, style: Theme.of(context).textTheme.titleMedium),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+            child: Row(
+              children: [
+                Expanded(child: Text(filename ?? '', style: Theme.of(context).textTheme.titleMedium)),
+                IconButton(
+                  key: const Key('copyJson'),
+                  tooltip: UiStrings.copyJson,
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: text));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text(UiStrings.copied)));
+                  },
+                  icon: const Icon(Icons.copy),
+                ),
+              ],
             ),
+          ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),

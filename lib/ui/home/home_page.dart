@@ -8,6 +8,7 @@ import 'package:sodalite_configurator/document/document_controller.dart';
 import 'package:sodalite_configurator/persistence/draft_store.dart';
 import 'package:sodalite_configurator/schema/catalog.dart';
 import 'package:sodalite_configurator/schema/node.dart';
+import 'package:sodalite_configurator/ui/draft_time.dart';
 import 'package:sodalite_configurator/ui/editor/editor_page.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
 
@@ -73,7 +74,7 @@ class _HomePageState extends State<HomePage> {
                         ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(draft.title),
-                          subtitle: Text('${draft.slug} · ${draft.updatedAt.toLocal()}'),
+                          subtitle: Text('${draft.slug} · ${formatDraftWhen(draft.updatedAt)}'),
                           onTap: () => _openDraft(draft.slug),
                           trailing: IconButton(
                             tooltip: UiStrings.deleteDraft,

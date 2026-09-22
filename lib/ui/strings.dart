@@ -22,6 +22,15 @@ abstract final class UiStrings {
   static const moveDown = 'Ниже';
   static const addAdditionalLayer = '+ дополнительный слой';
   static const addFile = 'Добавить файл';
+  static const copyJson = 'Копировать';
+  static const copied = 'JSON скопирован';
+  static const duplicateLayer = 'Дублировать слой';
+  static const undo = 'Вернуть';
+  static const removed = 'Блок удалён';
+  static const collapse = 'Свернуть';
+  static const expand = 'Развернуть';
+  static const addCriterion = 'Добавить критерий';
+  static const addFilterGroup = 'Добавить группу';
   static const tabApp = 'Приложение';
   static const tabBaseLayer = 'Базовый слой';
   static const tabAdditionalLayers = 'Доп. слои';
@@ -206,6 +215,12 @@ abstract final class UiStrings {
     }
     if (message.startsWith('At least one list value')) {
       return 'Нужно хотя бы одно значение списка';
+    }
+    if (message == 'Map key must not be blank') {
+      return 'Ключ не может быть пустым';
+    }
+    if (message == 'Map key is duplicated') {
+      return 'Такой ключ уже есть';
     }
     return message;
   }

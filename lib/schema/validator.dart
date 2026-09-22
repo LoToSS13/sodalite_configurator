@@ -52,6 +52,11 @@ void _validateField(Node node, FieldSpec spec, List<Issue> issues) {
     return;
   }
 
+  if (spec.kind == FieldKind.stringMap && value is List) {
+    _validateMapDraft(node, spec, value, issues);
+    return;
+  }
+
   if (!_hasExpectedType(value, spec.kind)) {
     issues.add(Issue(nodeId: node.id, path: spec.key, message: 'Value has the wrong type'));
     return;
@@ -80,6 +85,23 @@ void _validateField(Node node, FieldSpec spec, List<Issue> issues) {
 
   if (spec.pattern != null && (value is! String || !RegExp(spec.pattern!).hasMatch(value))) {
     issues.add(Issue(nodeId: node.id, path: spec.key, message: 'Value does not match the required pattern'));
+  }
+}
+
+void _validateMapDraft(Node node, FieldSpec spec, List<Object?> value, List<Issue> issues) {
+  final keys = <String>[];
+  for (final item in value) {
+    if (item is! Map || item['key'] is! String || item['value'] is! String) {
+      issues.add(Issue(nodeId: node.id, path: spec.key, message: 'Value has the wrong type'));
+      return;
+    }
+    keys.add(item['key'] as String);
+  }
+  if (keys.any((key) => key.trim().isEmpty)) {
+    issues.add(Issue(nodeId: node.id, path: spec.key, message: 'Map key must not be blank'));
+  }
+  if (keys.length != keys.toSet().length) {
+    issues.add(Issue(nodeId: node.id, path: spec.key, message: 'Map key is duplicated'));
   }
 }
 

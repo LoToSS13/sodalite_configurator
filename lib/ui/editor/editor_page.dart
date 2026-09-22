@@ -25,13 +25,34 @@ class EditorPage extends StatefulWidget {
 
 class _EditorPageState extends State<EditorPage> {
   EditorSection _section = EditorSection.app;
+  var _seenUndoEpoch = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onDocument);
+  }
 
   @override
   void dispose() {
+    widget.controller.removeListener(_onDocument);
     if (widget.ownsController) {
       widget.controller.dispose();
     }
     super.dispose();
+  }
+
+  void _onDocument() {
+    final epoch = widget.controller.undoEpoch;
+    if (epoch > _seenUndoEpoch && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(UiStrings.removed),
+          action: SnackBarAction(label: UiStrings.undo, onPressed: widget.controller.undo),
+        ),
+      );
+    }
+    _seenUndoEpoch = epoch;
   }
 
   void _onIssueTap(Issue issue) {

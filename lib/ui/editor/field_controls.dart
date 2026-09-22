@@ -59,9 +59,9 @@ class _FieldControl extends StatelessWidget {
         ],
         onChanged: (next) => controller.setField(node.id, spec.key, next),
       ),
-      FieldKind.integer => TextFormField(
+      FieldKind.integer => SyncedTextField(
         key: ValueKey('${node.id}-${spec.key}'),
-        initialValue: value == null ? '' : '$value',
+        value: value == null ? '' : '$value',
         decoration: InputDecoration(labelText: label, errorText: _error),
         keyboardType: TextInputType.number,
         onChanged: (text) {
@@ -80,7 +80,7 @@ class _FieldControl extends StatelessWidget {
         label: label,
         errorText: _error,
       ),
-      FieldKind.stringList => _StringListControl(
+      FieldKind.stringList => StringListEditor(
         node: node,
         spec: spec,
         controller: controller,
@@ -88,9 +88,9 @@ class _FieldControl extends StatelessWidget {
         errorText: _error,
       ),
       FieldKind.color => _ColorControl(node: node, spec: spec, controller: controller, label: label, errorText: _error),
-      FieldKind.string || FieldKind.nonEmptyString => TextFormField(
+      FieldKind.string || FieldKind.nonEmptyString => SyncedTextField(
         key: ValueKey('${node.id}-${spec.key}'),
-        initialValue: value is String ? value : '',
+        value: value is String ? value : '',
         decoration: InputDecoration(labelText: label, errorText: _error),
         onChanged: (text) {
           if (spec.key == 'slug') {
@@ -99,7 +99,7 @@ class _FieldControl extends StatelessWidget {
           }
           controller.setField(node.id, spec.key, text);
         },
-        onFieldSubmitted: spec.key == 'slug'
+        onSubmitted: spec.key == 'slug'
             ? (text) async {
                 final renamed = await controller.trySetSlug(text);
                 if (!renamed && context.mounted) {
@@ -131,33 +131,65 @@ class _ColorControl extends StatelessWidget {
   Widget build(BuildContext context) {
     final value = node.fields[spec.key];
     final parsed = _parseHexColor(value is String ? value : null);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 12, right: 12),
-          child: DecoratedBox(
-            key: ValueKey('${node.id}-${spec.key}-swatch'),
-            decoration: BoxDecoration(
-              color: parsed ?? Colors.transparent,
-              border: Border.all(color: Theme.of(context).colorScheme.outline),
-              borderRadius: BorderRadius.circular(4),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 12, right: 12),
+              child: DecoratedBox(
+                key: ValueKey('${node.id}-${spec.key}-swatch'),
+                decoration: BoxDecoration(
+                  color: parsed ?? Colors.transparent,
+                  border: Border.all(color: Theme.of(context).colorScheme.outline),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const SizedBox(width: 28, height: 28),
+              ),
             ),
-            child: const SizedBox(width: 28, height: 28),
-          ),
+            Expanded(
+              child: SyncedTextField(
+                key: ValueKey('${node.id}-${spec.key}'),
+                value: value is String ? value : '',
+                decoration: InputDecoration(labelText: label, errorText: errorText),
+                onChanged: (text) => controller.setField(node.id, spec.key, text),
+              ),
+            ),
+          ],
         ),
-        Expanded(
-          child: TextFormField(
-            key: ValueKey('${node.id}-${spec.key}'),
-            initialValue: value is String ? value : '',
-            decoration: InputDecoration(labelText: label, errorText: errorText),
-            onChanged: (text) => controller.setField(node.id, spec.key, text),
-          ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final hex in colorPalette)
+              GestureDetector(
+                key: ValueKey('${node.id}-${spec.key}-palette-$hex'),
+                onTap: () => controller.setField(node.id, spec.key, hex),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: _parseHexColor(hex),
+                    border: Border.all(
+                      color: value == hex
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.outline,
+                      width: value == hex ? 2 : 1,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const SizedBox(width: 24, height: 24),
+                ),
+              ),
+          ],
         ),
       ],
     );
   }
 }
+
+const colorPalette = <String>['#1D4ED8', '#0F766E', '#B45309', '#B91C1C', '#6D28D9', '#334155', '#111827', '#FFFFFF'];
 
 class _StringMapControl extends StatelessWidget {
   const _StringMapControl({
@@ -176,17 +208,43 @@ class _StringMapControl extends StatelessWidget {
 
   List<MapEntry<String, String>> get _entries {
     final value = node.fields[spec.key];
-    if (value is! Map) {
-      return const [];
+    if (value is Map) {
+      return [
+        for (final entry in value.entries)
+          if (entry.key is String && entry.value is String) MapEntry(entry.key as String, entry.value as String),
+      ];
     }
-    return [
-      for (final entry in value.entries)
-        if (entry.key is String && entry.value is String) MapEntry(entry.key as String, entry.value as String),
-    ];
+    if (value is List) {
+      return [
+        for (final item in value)
+          if (item is Map && item['key'] is String && item['value'] is String)
+            MapEntry(item['key'] as String, item['value'] as String),
+      ];
+    }
+    return const [];
   }
 
   void _commit(List<MapEntry<String, String>> entries) {
-    controller.setField(node.id, spec.key, {for (final entry in entries) entry.key: entry.value});
+    final keys = [for (final entry in entries) entry.key];
+    final blank = keys.any((key) => key.trim().isEmpty);
+    final duplicated = keys.length != keys.toSet().length;
+    final Object value = blank || duplicated
+        ? [
+            for (final entry in entries) {'key': entry.key, 'value': entry.value},
+          ]
+        : {for (final entry in entries) entry.key: entry.value};
+    controller.setField(node.id, spec.key, value);
+  }
+
+  String? _keyError(List<MapEntry<String, String>> entries, int index) {
+    final key = entries[index].key;
+    if (key.trim().isEmpty) {
+      return UiStrings.issueReason('Map key must not be blank');
+    }
+    if (entries.where((entry) => entry.key == key).length > 1) {
+      return UiStrings.issueReason('Map key is duplicated');
+    }
+    return null;
   }
 
   @override
@@ -202,10 +260,10 @@ class _StringMapControl extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: TextFormField(
+                    child: SyncedTextField(
                       key: ValueKey('${node.id}-${spec.key}-key-$index'),
-                      initialValue: entries[index].key,
-                      decoration: const InputDecoration(labelText: 'Ключ'),
+                      value: entries[index].key,
+                      decoration: InputDecoration(labelText: 'Ключ', errorText: _keyError(entries, index)),
                       onChanged: (text) {
                         final next = [...entries];
                         next[index] = MapEntry(text, next[index].value);
@@ -215,9 +273,9 @@ class _StringMapControl extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: TextFormField(
+                    child: SyncedTextField(
                       key: ValueKey('${node.id}-${spec.key}-value-$index'),
-                      initialValue: entries[index].value,
+                      value: entries[index].value,
                       decoration: const InputDecoration(labelText: 'Путь'),
                       onChanged: (text) {
                         final next = [...entries];
@@ -260,8 +318,9 @@ class _StringMapControl extends StatelessWidget {
   }
 }
 
-class _StringListControl extends StatelessWidget {
-  const _StringListControl({
+class StringListEditor extends StatelessWidget {
+  const StringListEditor({
+    super.key,
     required this.node,
     required this.spec,
     required this.controller,
@@ -299,9 +358,9 @@ class _StringListControl extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: TextFormField(
+                    child: SyncedTextField(
                       key: ValueKey('${node.id}-${spec.key}-$index'),
-                      initialValue: values[index],
+                      value: values[index],
                       onChanged: (text) {
                         final next = [...values];
                         next[index] = text;
@@ -341,4 +400,56 @@ Color? _parseHexColor(String? value) {
   final hex = value.substring(1);
   final parsed = int.parse(hex, radix: 16);
   return Color(hex.length == 6 ? 0xFF000000 | parsed : parsed);
+}
+
+class SyncedTextField extends StatefulWidget {
+  const SyncedTextField({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.decoration,
+    this.keyboardType,
+    this.onSubmitted,
+  });
+
+  final String value;
+  final ValueChanged<String> onChanged;
+  final InputDecoration? decoration;
+  final TextInputType? keyboardType;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  State<SyncedTextField> createState() => _SyncedTextFieldState();
+}
+
+class _SyncedTextFieldState extends State<SyncedTextField> {
+  late final TextEditingController _text = TextEditingController(text: widget.value);
+
+  @override
+  void didUpdateWidget(SyncedTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != _text.text) {
+      _text.value = TextEditingValue(
+        text: widget.value,
+        selection: TextSelection.collapsed(offset: widget.value.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: _text,
+      decoration: widget.decoration,
+      keyboardType: widget.keyboardType,
+      onChanged: widget.onChanged,
+      onFieldSubmitted: widget.onSubmitted,
+    );
+  }
 }

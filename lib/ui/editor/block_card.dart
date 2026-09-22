@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:sodalite_configurator/document/document_controller.dart';
+import 'package:sodalite_configurator/schema/ids.dart';
 import 'package:sodalite_configurator/schema/node.dart';
 import 'package:sodalite_configurator/schema/slot_spec.dart';
 import 'package:sodalite_configurator/ui/editor/field_controls.dart';
+import 'package:sodalite_configurator/ui/editor/filter_rows.dart';
+import 'package:sodalite_configurator/ui/editor/node_summary.dart';
 import 'package:sodalite_configurator/ui/editor/slot_add_button.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
 
-class BlockCard extends StatelessWidget {
+class BlockCard extends StatefulWidget {
   const BlockCard({
     super.key,
     required this.node,
@@ -23,11 +26,29 @@ class BlockCard extends StatelessWidget {
   final VoidCallback? onMoveDown;
 
   @override
+  State<BlockCard> createState() => _BlockCardState();
+}
+
+class _BlockCardState extends State<BlockCard> {
+  bool _expanded = true;
+
+  @override
+  void didUpdateWidget(BlockCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final selected = widget.controller.selectedId;
+    if (selected != null && widget.node.find(selected) != null) {
+      _expanded = true;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final catalog = controller.catalog;
-    final type = catalog.type(node.typeId);
+    final node = widget.node;
+    final controller = widget.controller;
+    final type = controller.catalog.type(node.typeId);
     final selected = controller.selectedId == node.id;
     final scheme = Theme.of(context).colorScheme;
+    final summary = nodeSummary(node);
 
     return Card(
       key: Key('node-${node.id}'),
@@ -45,35 +66,69 @@ class BlockCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(child: Text(type.labelRu, style: Theme.of(context).textTheme.titleMedium)),
-                if (onMoveUp != null)
+                IconButton(
+                  key: Key('collapse-${node.id}'),
+                  tooltip: _expanded ? UiStrings.collapse : UiStrings.expand,
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                  icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+                ),
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      style: Theme.of(context).textTheme.titleMedium,
+                      children: [
+                        TextSpan(text: type.labelRu),
+                        if (summary != null)
+                          TextSpan(
+                            text: ' · $summary',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (node.typeId == TypeIds.layer)
+                  IconButton(
+                    key: Key('duplicate-${node.id}'),
+                    tooltip: UiStrings.duplicateLayer,
+                    onPressed: () => controller.duplicateLayer(node.id),
+                    icon: const Icon(Icons.copy),
+                  ),
+                if (widget.onMoveUp != null)
                   IconButton(
                     key: Key('move-up-${node.id}'),
                     tooltip: UiStrings.moveUp,
-                    onPressed: onMoveUp,
+                    onPressed: widget.onMoveUp,
                     icon: const Icon(Icons.arrow_upward),
                   ),
-                if (onMoveDown != null)
+                if (widget.onMoveDown != null)
                   IconButton(
                     key: Key('move-down-${node.id}'),
                     tooltip: UiStrings.moveDown,
-                    onPressed: onMoveDown,
+                    onPressed: widget.onMoveDown,
                     icon: const Icon(Icons.arrow_downward),
                   ),
-                if (onRemove != null)
-                  IconButton(tooltip: 'Удалить', onPressed: onRemove, icon: const Icon(Icons.close)),
+                if (widget.onRemove != null)
+                  IconButton(tooltip: 'Удалить', onPressed: widget.onRemove, icon: const Icon(Icons.close)),
               ],
             ),
-            FieldControls(node: node, fields: type.fields, controller: controller),
-            for (final slot in type.slots) ..._slotSection(context, slot),
+            if (_expanded) ...[
+              FieldControls(node: node, fields: type.fields, controller: controller),
+              for (final slot in type.slots) ..._slotSection(slot),
+            ],
           ],
         ),
       ),
     );
   }
 
-  List<Widget> _slotSection(BuildContext context, SlotSpec slot) {
+  List<Widget> _slotSection(SlotSpec slot) {
+    final node = widget.node;
+    final controller = widget.controller;
     final children = node.childrenBySlot[slot.key] ?? const <Node>[];
+    if (slot.key == 'criterions') {
+      return [FilterCriterionList(parentId: node.id, children: children, controller: controller)];
+    }
     return [
       for (var index = 0; index < children.length; index++)
         Padding(
