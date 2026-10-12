@@ -1,0 +1,9 @@
+{
+  "runId": "sodalite-review-2026-09-30",
+  "status": "rolled back: local-only instruction",
+  "removedSectionId": "2619:1253",
+  "removalConfirmed": true,
+  "originalLibraryModified": false,
+  "componentsAreLive": false,
+  "localSpecifications": "component-audit.md"
+}

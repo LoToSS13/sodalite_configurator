@@ -1,8 +1,9 @@
+import 'package:sodalite_configurator/ui/sodalite_buttons.dart';
 import 'package:flutter/material.dart';
 import 'package:sodalite_configurator/document/document_controller.dart';
 import 'package:sodalite_configurator/schema/catalog.dart';
+import 'package:sodalite_configurator/schema/ids.dart';
 import 'package:sodalite_configurator/schema/slot_spec.dart';
-import 'package:sodalite_configurator/ui/strings.dart';
 
 class SlotAddButton extends StatelessWidget {
   const SlotAddButton({
@@ -20,85 +21,60 @@ class SlotAddButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = slot.key == 'additionalLayers'
-        ? UiStrings.addAdditionalLayer
-        : slot.allowedTypeIds.length == 1
-        ? catalog.type(slot.allowedTypeIds.single).labelRu
-        : slot.key;
+    final label = slot.allowedTypeIds.length == 1
+        ? _addLabel(slot.allowedTypeIds.single)
+        : switch (slot.key) {
+            'actions' => 'Добавить действие',
+            'filter' => 'Добавить фильтр',
+            _ => 'Добавить блок',
+          };
 
-    return PopupMenuButton<String>(
-      key: Key('slot-add-$parentId-${slot.key}'),
-      tooltip: label,
-      onSelected: (typeId) {
-        controller.addChild(parentId: parentId, slot: slot.key, typeId: typeId);
-      },
-      itemBuilder: (context) => [
-        for (final typeId in slot.allowedTypeIds)
-          PopupMenuItem<String>(value: typeId, child: Text(catalog.type(typeId).labelRu)),
-      ],
-      child: DashedSlotButton(label: label),
-    );
-  }
-}
+    Widget button(VoidCallback onPressed) =>
+        SodaliteButton.ghost(icon: const Icon(Icons.add, size: 20), label: Text(label), onPressed: onPressed);
 
-class DashedSlotButton extends StatelessWidget {
-  const DashedSlotButton({super.key, required this.label, this.onPressed});
-
-  final String label;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.outline;
-    final content = CustomPaint(
-      painter: _DashedRectPainter(color: color),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.add, color: color),
-            const SizedBox(width: 8),
-            Flexible(child: Text(label)),
-          ],
+    if (slot.allowedTypeIds.length == 1) {
+      return Align(
+        key: Key('slot-add-$parentId-${slot.key}'),
+        alignment: Alignment.centerLeft,
+        child: button(
+          () => controller.addChild(parentId: parentId, slot: slot.key, typeId: slot.allowedTypeIds.single),
         ),
+      );
+    }
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SodaliteMenuButton<String>(
+        key: Key('slot-add-$parentId-${slot.key}'),
+        tooltip: label,
+        onSelected: (typeId) {
+          controller.addChild(parentId: parentId, slot: slot.key, typeId: typeId);
+        },
+        itemBuilder: (context) => [
+          for (final typeId in slot.allowedTypeIds)
+            SodaliteMenuItem<String>(value: typeId, label: catalog.type(typeId).labelRu, icon: Icons.add),
+        ],
+        trigger: button,
       ),
     );
-
-    if (onPressed == null) {
-      return content;
-    }
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(onTap: onPressed, child: content),
-    );
   }
 }
 
-class _DashedRectPainter extends CustomPainter {
-  _DashedRectPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-    final path = Path()..addRRect(RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(8)));
-    const dash = 6.0;
-    const gap = 4.0;
-    for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        final next = (distance + dash).clamp(0, metric.length).toDouble();
-        canvas.drawPath(metric.extractPath(distance, next), paint);
-        distance += dash + gap;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedRectPainter oldDelegate) => oldDelegate.color != color;
-}
+String _addLabel(String typeId) => switch (typeId) {
+  TypeIds.layer => 'Добавить слой',
+  TypeIds.geoSource => 'Добавить источник',
+  TypeIds.geoStyle => 'Добавить оформление',
+  TypeIds.geoRule => 'Добавить правило',
+  TypeIds.info => 'Добавить карточку объекта',
+  TypeIds.infoSection => 'Добавить раздел информации',
+  TypeIds.fieldRow => 'Добавить поле',
+  TypeIds.imageSection => 'Добавить изображения',
+  TypeIds.attachmentSection => 'Добавить вложения',
+  TypeIds.inspectionTab => 'Добавить вкладку инспекции',
+  TypeIds.inspectionObject => 'Добавить объект инспекции',
+  TypeIds.inspectionCreation => 'Добавить создание при инспекции',
+  TypeIds.geometryType => 'Добавить тип геометрии',
+  TypeIds.searchObject => 'Добавить объект поиска',
+  TypeIds.searchFilterGroup => 'Добавить группу фильтра',
+  _ => 'Добавить блок',
+};

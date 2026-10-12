@@ -1,27 +1,30 @@
 import 'package:sodalite_configurator/schema/catalog.dart';
 import 'package:sodalite_configurator/schema/issue.dart';
 import 'package:sodalite_configurator/schema/node.dart';
+import 'package:sodalite_configurator/schema/ids.dart';
 
 abstract final class UiStrings {
+  static const appCard = 'Карточка модуля';
   static const createModule = 'Создать модуль';
-  static const openZip = 'Открыть zip';
+  static const openZip = 'Открыть ZIP';
   static const openJson = 'Открыть JSON';
-  static const downloadZip = 'Скачать zip';
+  static const downloadZip = 'Скачать ZIP';
   static const importFailed = 'Не удалось открыть модуль';
-  static const importNotesHeading = 'Предупреждения импорта';
+  static const importNotesHeading = 'Проверьте данные после импорта';
   static const enableObjectCreation = 'Включить создание объектов';
   static const enableSearch = 'Включить поиск';
-  static const confirmDisableFeature = 'Выключить функцию?';
-  static const confirmDisableFeatureBody = 'Карточка и все вложенные поля будут удалены.';
+  static const confirmDisableFeature = 'Удалить раздел?';
+  static const confirmDisableFeatureBody =
+      'Раздел и\u00a0его настройки будут удалены из\u00a0модуля. Сразу после удаления их\u00a0можно вернуть';
   static const cancel = 'Отмена';
-  static const confirm = 'Выключить';
-  static const addEntry = 'Добавить пару';
+  static const confirm = 'Удалить раздел';
+  static const addEntry = 'Добавить путь';
   static const addValue = 'Добавить значение';
   static const slugTaken = 'Черновик с таким идентификатором уже есть';
-  static const moveUp = 'Выше';
-  static const moveDown = 'Ниже';
-  static const addAdditionalLayer = '+ дополнительный слой';
-  static const addFile = 'Добавить файл';
+  static const moveUp = 'Переместить выше';
+  static const moveDown = 'Переместить ниже';
+  static const addAdditionalLayer = 'Добавить слой';
+  static const addFile = 'Добавить раздел';
   static const copyJson = 'Копировать';
   static const copied = 'JSON скопирован';
   static const duplicateLayer = 'Дублировать слой';
@@ -31,9 +34,9 @@ abstract final class UiStrings {
   static const expand = 'Развернуть';
   static const addCriterion = 'Добавить критерий';
   static const addFilterGroup = 'Добавить группу';
-  static const tabApp = 'Приложение';
+  static const tabApp = 'О модуле';
   static const tabBaseLayer = 'Базовый слой';
-  static const tabAdditionalLayers = 'Доп. слои';
+  static const tabAdditionalLayers = 'Дополнительные слои';
   static const jsonPreview = 'JSON';
   static const draftsHeading = 'Черновики';
   static const deleteDraft = 'Удалить';
@@ -76,7 +79,7 @@ abstract final class UiStrings {
     'objectCreation': 'Создание объектов',
     'search': 'Поиск',
     'geo': 'Геоданные',
-    'info': 'Информация',
+    'info': 'Карточка объекта',
     'infoSections': 'Разделы информации',
     'fields': 'Поля',
     'images': 'Изображения',
@@ -99,6 +102,7 @@ abstract final class UiStrings {
     'requireDateWatermark': 'Добавлять дату на изображение',
     'saveToGallery': 'Сохранять в галерею',
     'geometryTypes': 'Типы геометрии',
+    'type': 'Тип геометрии',
     'iconPath': 'Путь к иконке',
     'autoMode': 'Автоматический режим',
     'placeholder': 'Подсказка поиска',
@@ -113,7 +117,7 @@ abstract final class UiStrings {
     'criterions': 'Критерии',
     'reason': 'Причина',
     'rawType': 'Неизвестный тип действия',
-    'style': 'Стиль',
+    'style': 'Оформление',
     'sources': 'Источники',
     'rule': 'Правило',
     'typeId': 'Тип',
@@ -150,7 +154,7 @@ abstract final class UiStrings {
     var typeLabel = '';
     if (node != null) {
       try {
-        typeLabel = catalog.type(node.typeId).labelRu;
+        typeLabel = node.typeId == TypeIds.app ? appCard : catalog.type(node.typeId).labelRu;
       } on StateError {
         typeLabel = node.typeId;
       }
@@ -160,31 +164,31 @@ abstract final class UiStrings {
 
   static String issueReason(String message) {
     if (message == 'Required field is missing') {
-      return 'Обязательное поле не заполнено';
+      return 'Заполните обязательное поле';
     }
     if (message == 'Value has the wrong type') {
       return 'Неверный тип значения';
     }
     if (message == 'Required field must not be blank') {
-      return 'Поле не должно быть пустым';
+      return 'Заполните обязательное поле';
     }
     if (message.startsWith('Value must be at least')) {
-      return 'Значение слишком маленькое';
+      return 'Минимальное значение — ${message.split(' ').last}';
     }
     if (message.startsWith('Value must be at most')) {
-      return 'Значение слишком большое';
+      return 'Максимальное значение — ${message.split(' ').last}';
     }
     if (message == 'Value is not in the allowed values') {
-      return 'Значение не из списка допустимых';
+      return 'Выберите значение из\u00a0списка';
     }
     if (message == 'Value must be a hexadecimal color') {
-      return 'Нужен цвет в формате #RRGGBB';
+      return 'Укажите цвет в\u00a0формате #RRGGBB или\u00a0#RRGGBBAA';
     }
     if (message == 'Value does not match the required pattern') {
       return 'Значение не соответствует формату';
     }
     if (message == 'Slot has invalid cardinality') {
-      return 'Слот заполнен неверно';
+      return 'Проверьте количество блоков в\u00a0этом разделе';
     }
     if (message.startsWith('Child type')) {
       return 'Недопустимый тип блока';

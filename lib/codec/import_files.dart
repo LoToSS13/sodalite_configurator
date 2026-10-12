@@ -7,11 +7,30 @@ import 'package:sodalite_configurator/codec/module_codec.dart';
 export 'package:sodalite_configurator/codec/import_result.dart';
 
 ImportResult importZip(List<int> bytes, {required String Function() id}) {
+  try {
+    return _importZip(bytes, id: id);
+  } on FormatException catch (error) {
+    return ImportResult(errors: [error.message]);
+  } catch (_) {
+    return const ImportResult(errors: ['Не удалось прочитать ZIP. Проверьте, что архив не повреждён.']);
+  }
+}
+
+/// Report the file name, never the undecodable file contents.
+String decodeImportText(String filename, List<int> bytes) {
+  try {
+    return utf8.decode(bytes);
+  } on FormatException {
+    throw FormatException('Файл «$filename» не удалось прочитать. Сохраните его в кодировке UTF-8.');
+  }
+}
+
+ImportResult _importZip(List<int> bytes, {required String Function() id}) {
   final Archive archive;
   try {
     archive = ZipDecoder().decodeBytes(bytes);
-  } catch (error) {
-    return ImportResult(errors: ['zip: $error']);
+  } catch (_) {
+    return const ImportResult(errors: ['Не удалось прочитать ZIP. Проверьте, что архив не повреждён.']);
   }
 
   final fileNames = [
@@ -33,7 +52,7 @@ ImportResult importZip(List<int> bytes, {required String Function() id}) {
       }
       final relative = file.name.substring(prefix.length + 1);
       if (kModulePackFileNames.contains(relative)) {
-        contents[relative] = utf8.decode(file.content as List<int>);
+        contents[relative] = decodeImportText(file.name, file.content as List<int>);
       }
     }
     return importLooseFiles(
@@ -46,7 +65,10 @@ ImportResult importZip(List<int> bytes, {required String Function() id}) {
 
   final contents = <String, String>{};
   for (final file in archive.files.where((file) => file.isFile)) {
-    contents[file.name] = utf8.decode(file.content as List<int>);
+    // Unknown files still produce a warning, but must not be decoded as text.
+    contents[file.name] = kModulePackFileNames.contains(moduleFileName(file.name))
+        ? decodeImportText(file.name, file.content as List<int>)
+        : '';
   }
   return importLooseFiles(contents, id: id);
 }

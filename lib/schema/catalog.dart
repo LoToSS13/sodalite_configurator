@@ -72,10 +72,10 @@ class Catalog {
       ),
       TypeIds.geoStyle: const NodeType(
         id: TypeIds.geoStyle,
-        labelRu: 'Стиль геоданных',
+        labelRu: 'Оформление',
         fields: [
           FieldSpec(key: 'color', kind: FieldKind.color, required: true),
-          FieldSpec(key: 'isDashed', kind: FieldKind.boolean, required: true),
+          FieldSpec(key: 'isDashed', kind: FieldKind.boolean, required: true, defaultValue: false),
         ],
       ),
       TypeIds.geoSource: const NodeType(
@@ -107,7 +107,7 @@ class Catalog {
       ),
       TypeIds.info: const NodeType(
         id: TypeIds.info,
-        labelRu: 'Информация',
+        labelRu: 'Карточка объекта',
         fields: [
           FieldSpec(key: 'alias', kind: FieldKind.nonEmptyString, required: true),
           FieldSpec(key: 'paths', kind: FieldKind.stringMap),

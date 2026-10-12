@@ -1,4 +1,10 @@
+import 'package:sodalite_configurator/ui/sodalite_buttons.dart';
+import 'package:sodalite_configurator/ui/sodalite_select.dart';
 import 'package:flutter/material.dart';
+import 'package:sodalite_configurator/ui/sodalite_tooltip.dart';
+import 'package:sodalite_configurator/ui/design_system.dart';
+import 'package:sodalite_configurator/ui/editor/slug_field.dart';
+import 'package:sodalite_configurator/schema/ids.dart';
 import 'package:sodalite_configurator/document/document_controller.dart';
 import 'package:sodalite_configurator/schema/field_spec.dart';
 import 'package:sodalite_configurator/schema/issue.dart';
@@ -16,10 +22,19 @@ class FieldControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        for (final spec in fields)
+        for (var index = 0; index < fields.length; index++)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _FieldControl(node: node, spec: spec, controller: controller),
+            key: ValueKey('${node.id}-${fields[index].key}'),
+            padding: EdgeInsets.only(bottom: index == fields.length - 1 ? 0 : 16),
+            child: Focus(
+              canRequestFocus: false,
+              onFocusChange: (hasFocus) {
+                if (!hasFocus && context.mounted) {
+                  controller.markFieldVisited(node.id, fields[index].key);
+                }
+              },
+              child: _FieldControl(node: node, spec: fields[index], controller: controller),
+            ),
           ),
       ],
     );
@@ -34,35 +49,73 @@ class _FieldControl extends StatelessWidget {
   final DocumentController controller;
 
   String? get _error {
-    final Issue? issue = controller.issues.where((item) => item.nodeId == node.id && item.path == spec.key).firstOrNull;
+    final Issue? issue = controller.visibleIssues
+        .where((item) => item.nodeId == node.id && item.path == spec.key)
+        .firstOrNull;
     return issue == null ? null : UiStrings.issueReason(issue.message);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (spec.key == 'slug') return SlugField(controller: controller);
     final value = node.fields[spec.key];
-    final label = UiStrings.pathLabel(spec.key);
+    final label = '${UiStrings.pathLabel(spec.key)}${spec.required && spec.kind != FieldKind.boolean ? ' *' : ''}';
+    final helper = switch (spec.key) {
+      'alias' => 'Точный алиас из\u00a0настройки источника данных',
+      'title' when node.typeId == TypeIds.app => 'Название модуля в\u00a0списке приложений Sodalite',
+      'subtitle' when node.typeId == TypeIds.app => 'Краткое описание назначения модуля',
+      'visibilityThreshold' => 'Уровень масштаба: 15, 16 или\u00a017',
+      _ => null,
+    };
+    final decoration = InputDecoration(labelText: label, errorText: _error, helperText: helper);
     return switch (spec.kind) {
-      FieldKind.boolean => SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Text(label),
-        value: value as bool? ?? false,
+      FieldKind.boolean when spec.required && value is! bool => SodaliteSelect<bool>(
+        key: ValueKey('${node.id}-${spec.key}-unset'),
+        value: null,
+        decoration: InputDecoration(
+          labelText: '$label *',
+          errorText: _error == null ? null : 'Выберите «Да» или «Нет»',
+        ),
+        values: const [true, false],
+        labelOf: (value) => value ? 'Да' : 'Нет',
         onChanged: (next) => controller.setField(node.id, spec.key, next),
       ),
-      FieldKind.enumeration => DropdownButtonFormField<String>(
+      FieldKind.boolean => Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          final focused = Focus.of(context).hasFocus;
+          return Theme(
+            data: theme.copyWith(
+              highlightColor: Colors.transparent,
+              splashColor: Colors.transparent,
+              focusColor: Colors.transparent,
+              splashFactory: NoSplash.splashFactory,
+              switchTheme: theme.switchTheme.copyWith(
+                trackOutlineColor: WidgetStatePropertyAll(focused ? SodaliteColors.text : Colors.transparent),
+                trackOutlineWidth: WidgetStatePropertyAll(focused ? 2 : 0),
+              ),
+            ),
+            child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(label),
+              value: value as bool? ?? false,
+              onChanged: (next) => controller.setField(node.id, spec.key, next),
+            ),
+          );
+        },
+      ),
+      FieldKind.enumeration => SodaliteSelect<String>(
         key: ValueKey('${node.id}-${spec.key}'),
-        initialValue: spec.enumValues?.contains(value) == true ? value as String : null,
-        decoration: InputDecoration(labelText: label, errorText: _error),
-        items: [
-          for (final item in spec.enumValues ?? const <String>[])
-            DropdownMenuItem(value: item, child: Text(UiStrings.enumLabel(item))),
-        ],
+        value: spec.enumValues?.contains(value) == true ? value as String : null,
+        decoration: decoration,
+        values: spec.enumValues ?? const <String>[],
+        labelOf: UiStrings.enumLabel,
         onChanged: (next) => controller.setField(node.id, spec.key, next),
       ),
       FieldKind.integer => SyncedTextField(
         key: ValueKey('${node.id}-${spec.key}'),
         value: value == null ? '' : '$value',
-        decoration: InputDecoration(labelText: label, errorText: _error),
+        decoration: decoration,
         keyboardType: TextInputType.number,
         onChanged: (text) {
           final trimmed = text.trim();
@@ -91,22 +144,8 @@ class _FieldControl extends StatelessWidget {
       FieldKind.string || FieldKind.nonEmptyString => SyncedTextField(
         key: ValueKey('${node.id}-${spec.key}'),
         value: value is String ? value : '',
-        decoration: InputDecoration(labelText: label, errorText: _error),
-        onChanged: (text) {
-          if (spec.key == 'slug') {
-            controller.setField(node.id, spec.key, text, saveDraft: false);
-            return;
-          }
-          controller.setField(node.id, spec.key, text);
-        },
-        onSubmitted: spec.key == 'slug'
-            ? (text) async {
-                final renamed = await controller.trySetSlug(text);
-                if (!renamed && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text(UiStrings.slugTaken)));
-                }
-              }
-            : null,
+        decoration: decoration,
+        onChanged: (text) => controller.setField(node.id, spec.key, text),
       ),
     };
   }
@@ -144,9 +183,9 @@ class _ColorControl extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: parsed ?? Colors.transparent,
                   border: Border.all(color: Theme.of(context).colorScheme.outline),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const SizedBox(width: 28, height: 28),
+                child: const SizedBox(width: 32, height: 32),
               ),
             ),
             Expanded(
@@ -161,25 +200,55 @@ class _ColorControl extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: 4,
+          runSpacing: 4,
           children: [
             for (final hex in colorPalette)
-              GestureDetector(
+              Semantics(
                 key: ValueKey('${node.id}-${spec.key}-palette-$hex'),
-                onTap: () => controller.setField(node.id, spec.key, hex),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: _parseHexColor(hex),
-                    border: Border.all(
-                      color: value == hex
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.outline,
-                      width: value == hex ? 2 : 1,
+                button: true,
+                selected: parsed == _parseHexColor(hex),
+                label: '${_paletteNames[hex]}, $hex',
+                child: SodaliteTooltip(
+                  message: '${_paletteNames[hex]} · $hex',
+                  excludeFromSemantics: true,
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      onTap: () => controller.setField(node.id, spec.key, hex),
+                      borderRadius: BorderRadius.circular(12),
+                      hoverColor: Colors.transparent,
+                      focusColor: SodaliteColors.accentMuted,
+                      splashFactory: NoSplash.splashFactory,
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        padding: const EdgeInsets.all(6),
+                        foregroundDecoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: parsed == _parseHexColor(hex) ? SodaliteColors.text : Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: _parseHexColor(hex),
+                            borderRadius: BorderRadius.circular(8),
+                            border: hex == '#FFFFFF' ? Border.all(color: SodaliteColors.border) : null,
+                          ),
+                          child: parsed == _parseHexColor(hex)
+                              ? Icon(
+                                  Icons.check,
+                                  size: 18,
+                                  color: (_parseHexColor(hex)!.computeLuminance() > .179) ? Colors.black : Colors.white,
+                                )
+                              : null,
+                        ),
+                      ),
                     ),
-                    borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const SizedBox(width: 24, height: 24),
                 ),
               ),
           ],
@@ -189,7 +258,19 @@ class _ColorControl extends StatelessWidget {
   }
 }
 
-const colorPalette = <String>['#1D4ED8', '#0F766E', '#B45309', '#B91C1C', '#6D28D9', '#334155', '#111827', '#FFFFFF'];
+// Figma Tokens: Blue/500, Blue/700, Green/500, Yellow/950, Red/500,
+// Gray/700, Gray/900, Gray/000. Suggestions only; custom HEX remains available.
+const colorPalette = <String>['#0075FF', '#0C4CB7', '#40C267', '#C2A840', '#F04438', '#5E5E5E', '#191A1B', '#FFFFFF'];
+const _paletteNames = <String, String>{
+  '#0075FF': 'Синий',
+  '#40C267': 'Зелёный',
+  '#C2A840': 'Золотистый',
+  '#F04438': 'Красный',
+  '#0C4CB7': 'Глубокий синий',
+  '#5E5E5E': 'Серый',
+  '#191A1B': 'Тёмный',
+  '#FFFFFF': 'Белый',
+};
 
 class _StringMapControl extends StatelessWidget {
   const _StringMapControl({
@@ -237,6 +318,7 @@ class _StringMapControl extends StatelessWidget {
   }
 
   String? _keyError(List<MapEntry<String, String>> entries, int index) {
+    if (errorText == null) return null;
     final key = entries[index].key;
     if (key.trim().isEmpty) {
       return UiStrings.issueReason('Map key must not be blank');
@@ -251,7 +333,15 @@ class _StringMapControl extends StatelessWidget {
   Widget build(BuildContext context) {
     final entries = _entries;
     return InputDecorator(
-      decoration: InputDecoration(labelText: label, errorText: errorText, border: const OutlineInputBorder()),
+      decoration: InputDecoration(
+        labelText: label,
+        errorText: errorText,
+        filled: false,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: SodaliteColors.muted),
+        ),
+      ),
       child: Column(
         children: [
           for (var index = 0; index < entries.length; index++)
@@ -284,8 +374,8 @@ class _StringMapControl extends StatelessWidget {
                       },
                     ),
                   ),
-                  IconButton(
-                    tooltip: UiStrings.deleteDraft,
+                  SodaliteIconButton(
+                    tooltip: 'Удалить значение',
                     onPressed: () {
                       final next = [...entries]..removeAt(index);
                       _commit(next);
@@ -297,7 +387,7 @@ class _StringMapControl extends StatelessWidget {
             ),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton(
+            child: SodaliteButton.ghost(
               key: ValueKey('${node.id}-${spec.key}-add'),
               onPressed: () {
                 var key = '';
@@ -349,7 +439,15 @@ class StringListEditor extends StatelessWidget {
   Widget build(BuildContext context) {
     final values = _values;
     return InputDecorator(
-      decoration: InputDecoration(labelText: label, errorText: errorText, border: const OutlineInputBorder()),
+      decoration: InputDecoration(
+        labelText: label,
+        errorText: errorText,
+        filled: false,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: SodaliteColors.muted),
+        ),
+      ),
       child: Column(
         children: [
           for (var index = 0; index < values.length; index++)
@@ -368,8 +466,8 @@ class StringListEditor extends StatelessWidget {
                       },
                     ),
                   ),
-                  IconButton(
-                    tooltip: UiStrings.deleteDraft,
+                  SodaliteIconButton(
+                    tooltip: 'Удалить значение',
                     onPressed: () {
                       final next = [...values]..removeAt(index);
                       controller.setField(node.id, spec.key, next);
@@ -381,7 +479,7 @@ class StringListEditor extends StatelessWidget {
             ),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton(
+            child: SodaliteButton.ghost(
               key: ValueKey('${node.id}-${spec.key}-add'),
               onPressed: () => controller.setField(node.id, spec.key, [...values, '']),
               child: const Text(UiStrings.addValue),

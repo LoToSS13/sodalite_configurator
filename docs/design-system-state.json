@@ -1,0 +1,34 @@
+{
+  "runId": "sodalite-review-2026-09-30",
+  "scope": "local implementation audit",
+  "fileKey": "JsnlUudhlN3ZuGGWYcHKU8",
+  "pageId": "89:15459",
+  "components": {},
+  "existing": {
+    "Button": "169:13786",
+    "IconButton": "89:15564",
+    "Card": "1387:30314",
+    "Badge": "91:16752",
+    "ContextMenu": "1191:7852"
+  },
+  "completed": [
+    "source-inventory",
+    "mobbin-reference-selection",
+    "local-button-and-spacing-fixes",
+    "temporary-figma-section-removed",
+    "original-library-confirmed-unchanged",
+    "final-web-build",
+    "desktop-1440x1000",
+    "keyboard-collapse-expand",
+    "keyboard-menu-and-dialog",
+    "json-copy-confirmed"
+  ],
+  "pending": [],
+  "componentSpecifications": "component-audit.md",
+  "externalChangesRetained": false,
+  "limitations": [
+    "No frame-by-frame animation timing capture",
+    "Loading not artificially delayed",
+    "Material icons remain an explicit adaptation"
+  ]
+}

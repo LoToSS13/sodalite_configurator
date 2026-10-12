@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -17,8 +17,9 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Конфигуратор модулей Sodalite: слои, карточки объектов и поиск.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -29,10 +30,32 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>sodalite_configurator</title>
+  <title>Sodalite — Конфигуратор</title>
   <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="splash.css">
 </head>
 <body>
+  <div id="startup-screen" aria-label="Загрузка конфигуратора">
+    <div class="startup-backdrop" aria-hidden="true">
+      <canvas id="startup-background"></canvas>
+    </div>
+    <main class="startup-content">
+      <div class="startup-brand">
+        <img src="assets/assets/images/sodalite.png" width="56" height="56" alt="">
+        <div>
+          <h1>Sodalite</h1>
+          <p>Конфигуратор</p>
+        </div>
+      </div>
+      <div class="startup-status" role="status" aria-live="polite">
+        <span class="startup-spinner" aria-hidden="true"></span>
+        <span id="startup-message">Загружаем конфигуратор…</span>
+      </div>
+      <button id="startup-retry" type="button" hidden>Обновить страницу</button>
+      <noscript>Для работы конфигуратора включите JavaScript в браузере.</noscript>
+    </main>
+  </div>
+  <script src="splash.js"></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

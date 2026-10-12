@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sodalite_configurator/ui/design_system.dart';
 import 'package:sodalite_configurator/codec/download.dart';
 import 'package:sodalite_configurator/document/document_controller.dart';
 import 'package:sodalite_configurator/persistence/draft_store.dart';
@@ -26,7 +27,8 @@ class ConfiguratorApp extends StatelessWidget {
     final downloadFn = download ?? downloadBytes;
     return MaterialApp(
       title: 'Sodalite Configurator',
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2B4C7E))),
+      debugShowCheckedModeBanner: false,
+      theme: sodaliteTheme(),
       home: controller == null
           ? HomePage(download: downloadFn, pickZipBytes: pickZipBytes, pickJsonFiles: pickJsonFiles, drafts: drafts)
           : EditorPage(controller: controller!, download: downloadFn),

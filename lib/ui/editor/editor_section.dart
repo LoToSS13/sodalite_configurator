@@ -2,6 +2,9 @@ import 'package:sodalite_configurator/codec/json_format.dart';
 import 'package:sodalite_configurator/codec/module_codec.dart';
 import 'package:sodalite_configurator/schema/issue.dart';
 import 'package:sodalite_configurator/schema/node.dart';
+import 'package:sodalite_configurator/schema/catalog.dart';
+import 'package:sodalite_configurator/schema/ids.dart';
+import 'package:sodalite_configurator/ui/editor/node_summary.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
 
 enum EditorSection { app, baseLayer, additionalLayers, objectCreation, search }
@@ -55,6 +58,46 @@ String editorSectionPreviewText(Node root, EditorSection section) {
   return encodeJson(value);
 }
 
+/// The selected editor node's location in the exported JSON for this section.
+List<Object>? editorSectionPreviewPath(Node root, EditorSection section, String? nodeId) {
+  if (nodeId == null) return null;
+  final route = _nodeRoute(root, nodeId);
+  if (route == null || route.isEmpty || route.first.slot != section.name) return null;
+
+  final path = <Object>[if (section == EditorSection.additionalLayers) route.first.index];
+  for (final step in route.skip(1)) {
+    if (step.slot == 'objects') {
+      path.addAll(['objects', step.child.fields['pathKey'] as String? ?? '']);
+      continue;
+    }
+    if (step.slot == 'criterions' && step.child.typeId == TypeIds.searchFilterInvalid) break;
+    path.add(step.slot);
+    if (!_singleJsonSlots.contains(step.slot)) {
+      final siblings = step.parent.childrenBySlot[step.slot] ?? const <Node>[];
+      path.add(
+        step.slot == 'criterions'
+            ? siblings.take(step.index).where((node) => node.typeId != TypeIds.searchFilterInvalid).length
+            : step.index,
+      );
+    }
+  }
+  return path;
+}
+
+const _singleJsonSlots = {'geo', 'info', 'style', 'rule', 'filter', 'creation'};
+
+List<({Node parent, String slot, int index, Node child})>? _nodeRoute(Node node, String nodeId) {
+  if (node.id == nodeId) return [];
+  for (final entry in node.childrenBySlot.entries) {
+    for (var index = 0; index < entry.value.length; index++) {
+      final child = entry.value[index];
+      final tail = _nodeRoute(child, nodeId);
+      if (tail != null) return [(parent: node, slot: entry.key, index: index, child: child), ...tail];
+    }
+  }
+  return null;
+}
+
 EditorSection editorSectionOf(Node root, String nodeId) {
   if (root.id == nodeId) {
     return EditorSection.app;
@@ -85,6 +128,34 @@ EditorSection editorSectionOf(Node root, String nodeId) {
 
 int editorSectionIssueCount(Node root, List<Issue> issues, EditorSection section) {
   return issues.where((issue) => editorSectionOf(root, issue.nodeId) == section).length;
+}
+
+String? editorSelectionPath(Node root, EditorSection section, String? nodeId, Catalog catalog) {
+  if (nodeId == null) return null;
+  final chain = _nodeChain(root, nodeId);
+  if (chain == null) return null;
+  final nodes = chain.skip(
+    section == EditorSection.baseLayer || section == EditorSection.objectCreation || section == EditorSection.search
+        ? 2
+        : 1,
+  );
+  final labels = <String>[
+    editorSectionLabel(section),
+    for (final node in nodes)
+      nodeName(node) ?? (node.typeId == TypeIds.app ? UiStrings.appCard : catalog.type(node.typeId).labelRu),
+  ];
+  return labels.length > 1 ? labels.join(' › ') : null;
+}
+
+List<Node>? _nodeChain(Node node, String nodeId) {
+  if (node.id == nodeId) return [node];
+  for (final children in node.childrenBySlot.values) {
+    for (final child in children) {
+      final chain = _nodeChain(child, nodeId);
+      if (chain != null) return [node, ...chain];
+    }
+  }
+  return null;
 }
 
 bool _has(Node root, String slot) => (root.childrenBySlot[slot] ?? const <Node>[]).isNotEmpty;
