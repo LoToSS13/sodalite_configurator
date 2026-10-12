@@ -1,4 +1,6 @@
+import 'package:sodalite_configurator/ui/help_copy.dart';
 import 'package:sodalite_configurator/ui/sodalite_buttons.dart';
+import 'package:sodalite_configurator/ui/sodalite_help.dart';
 import 'package:flutter/material.dart';
 import 'package:sodalite_configurator/ui/design_system.dart';
 import 'package:sodalite_configurator/document/document_controller.dart';
@@ -26,6 +28,7 @@ class SlugField extends StatelessWidget {
                   'Идентификатор',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: SodaliteColors.secondary),
                 ),
+                const SodaliteHelpButton(name: 'Идентификатор', text: HelpCopy.moduleSlug),
                 SelectableText(
                   controller.root.fields['slug'] as String? ?? '',
                   style: Theme.of(context).textTheme.titleSmall,

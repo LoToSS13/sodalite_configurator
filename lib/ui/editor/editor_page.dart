@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:sodalite_configurator/ui/sodalite_buttons.dart';
 import 'package:flutter/material.dart';
+import 'package:sodalite_configurator/ui/sodalite_help.dart';
 import 'package:sodalite_configurator/ui/sodalite_tooltip.dart';
 import 'package:sodalite_configurator/ui/design_system.dart';
 import 'package:sodalite_configurator/ui/editor/editor_navigation.dart';
@@ -503,27 +504,29 @@ class _EditorPageState extends State<EditorPage> {
             ],
           ),
         );
-        return Row(
-          children: [
-            if (wide) ...[
-              SizedBox(width: navigationWidth, child: navigation()),
-              PanelDivider(
-                label: 'Ширина дерева модуля',
-                headerHeight: 80,
-                onDelta: (delta) => setState(
-                  () => _navigationWidth = (navigationWidth + delta).clamp(
-                    224.0,
-                    math.min(
-                      navigationMax,
-                      width - minWorkspaceWidth - (inlineJson && _showJson ? inspectorWidth + sideSpacing : 16.0),
+        return HelpScope(
+          child: Row(
+            children: [
+              if (wide) ...[
+                SizedBox(width: navigationWidth, child: navigation()),
+                PanelDivider(
+                  label: 'Ширина дерева модуля',
+                  headerHeight: 80,
+                  onDelta: (delta) => setState(
+                    () => _navigationWidth = (navigationWidth + delta).clamp(
+                      224.0,
+                      math.min(
+                        navigationMax,
+                        width - minWorkspaceWidth - (inlineJson && _showJson ? inspectorWidth + sideSpacing : 16.0),
+                      ),
                     ),
                   ),
+                  onReset: () => setState(() => _navigationWidth = 256),
                 ),
-                onReset: () => setState(() => _navigationWidth = 256),
-              ),
+              ],
+              Expanded(child: workspace),
             ],
-            Expanded(child: workspace),
-          ],
+          ),
         );
       },
     );

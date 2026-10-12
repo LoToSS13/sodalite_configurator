@@ -12,6 +12,8 @@ import 'package:sodalite_configurator/ui/editor/node_summary.dart';
 import 'package:sodalite_configurator/ui/editor/slot_add_button.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
 import 'package:sodalite_configurator/ui/sodalite_dialog.dart';
+import 'package:sodalite_configurator/ui/help_copy.dart';
+import 'package:sodalite_configurator/ui/sodalite_help.dart';
 import 'package:sodalite_configurator/ui/sodalite_tooltip.dart';
 
 class BlockCard extends StatelessWidget {
@@ -75,22 +77,29 @@ class BlockCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SodaliteTooltip(
-                    message: label,
-                    excludeFromSemantics: true,
-                    child: Semantics(
-                      selected: selected,
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style:
-                            (this.depth == 0
-                                    ? sodaliteCardTitleStyle(context)
-                                    : Theme.of(context).textTheme.titleMedium)
-                                ?.copyWith(color: selected ? SodaliteColors.accentStrong : SodaliteColors.text),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: SodaliteTooltip(
+                          message: label,
+                          excludeFromSemantics: true,
+                          child: Semantics(
+                            selected: selected,
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style:
+                                  (this.depth == 0
+                                          ? sodaliteCardTitleStyle(context)
+                                          : Theme.of(context).textTheme.titleMedium)
+                                      ?.copyWith(color: selected ? SodaliteColors.accentStrong : SodaliteColors.text),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                      if (HelpCopy.block(node.typeId) case final help?) SodaliteHelpButton(name: label, text: help),
+                    ],
                   ),
                   if (summary != null)
                     SodaliteTooltip(

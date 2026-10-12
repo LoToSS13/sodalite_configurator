@@ -1,4 +1,6 @@
+import 'package:sodalite_configurator/ui/help_copy.dart';
 import 'package:sodalite_configurator/ui/sodalite_buttons.dart';
+import 'package:sodalite_configurator/ui/sodalite_help.dart';
 import 'package:sodalite_configurator/ui/sodalite_select.dart';
 import 'package:flutter/material.dart';
 import 'package:sodalite_configurator/ui/sodalite_tooltip.dart';
@@ -60,20 +62,22 @@ class _FieldControl extends StatelessWidget {
     if (spec.key == 'slug') return SlugField(controller: controller);
     final value = node.fields[spec.key];
     final label = '${UiStrings.pathLabel(spec.key)}${spec.required && spec.kind != FieldKind.boolean ? ' *' : ''}';
-    final helper = switch (spec.key) {
-      'alias' => 'Точный алиас из\u00a0настройки источника данных',
-      'title' when node.typeId == TypeIds.app => 'Название модуля в\u00a0списке приложений Sodalite',
-      'subtitle' when node.typeId == TypeIds.app => 'Краткое описание назначения модуля',
-      'visibilityThreshold' => 'Уровень масштаба: 15, 16 или\u00a017',
+    final help = HelpCopy.field(node.typeId, spec.key);
+    final helper = switch ((node.typeId, spec.key)) {
+      (TypeIds.geo, 'alias') ||
+      (TypeIds.info, 'alias') ||
+      (TypeIds.searchObject, 'alias') ||
+      (TypeIds.geoSource, 'view') => 'Точный алиас из\u00a0настройки источника данных',
+      (_, 'visibilityThreshold') => 'Уровень масштаба: 15, 16 или\u00a017',
       _ => null,
     };
-    final decoration = InputDecoration(labelText: label, errorText: _error, helperText: helper);
-    return switch (spec.kind) {
+    final decoration = InputDecoration(labelText: help == null ? label : null, errorText: _error, helperText: helper);
+    final control = switch (spec.kind) {
       FieldKind.boolean when spec.required && value is! bool => SodaliteSelect<bool>(
         key: ValueKey('${node.id}-${spec.key}-unset'),
         value: null,
         decoration: InputDecoration(
-          labelText: '$label *',
+          labelText: help == null ? '$label *' : null,
           errorText: _error == null ? null : 'Выберите «Да» или «Нет»',
         ),
         values: const [true, false],
@@ -97,7 +101,15 @@ class _FieldControl extends StatelessWidget {
             ),
             child: SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(label),
+              title: help == null
+                  ? Text(label)
+                  : Row(
+                      children: [
+                        Flexible(child: Text(label)),
+                        SodaliteHelpButton(name: UiStrings.pathLabel(spec.key), text: help),
+                        const Spacer(),
+                      ],
+                    ),
               value: value as bool? ?? false,
               onChanged: (next) => controller.setField(node.id, spec.key, next),
             ),
@@ -132,6 +144,7 @@ class _FieldControl extends StatelessWidget {
         controller: controller,
         label: label,
         errorText: _error,
+        floatingLabel: help == null,
       ),
       FieldKind.stringList => StringListEditor(
         node: node,
@@ -139,6 +152,7 @@ class _FieldControl extends StatelessWidget {
         controller: controller,
         label: label,
         errorText: _error,
+        floatingLabel: help == null,
       ),
       FieldKind.color => _ColorControl(node: node, spec: spec, controller: controller, label: label, errorText: _error),
       FieldKind.string || FieldKind.nonEmptyString => SyncedTextField(
@@ -148,6 +162,21 @@ class _FieldControl extends StatelessWidget {
         onChanged: (text) => controller.setField(node.id, spec.key, text),
       ),
     };
+    if (help == null || (spec.kind == FieldKind.boolean && value is bool)) return control;
+    final labelStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(color: SodaliteColors.secondary);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Flexible(child: Text(label, style: labelStyle)),
+            SodaliteHelpButton(name: UiStrings.pathLabel(spec.key), text: help),
+            const Spacer(),
+          ],
+        ),
+        control,
+      ],
+    );
   }
 }
 
@@ -279,6 +308,7 @@ class _StringMapControl extends StatelessWidget {
     required this.controller,
     required this.label,
     required this.errorText,
+    this.floatingLabel = true,
   });
 
   final Node node;
@@ -286,6 +316,7 @@ class _StringMapControl extends StatelessWidget {
   final DocumentController controller;
   final String label;
   final String? errorText;
+  final bool floatingLabel;
 
   List<MapEntry<String, String>> get _entries {
     final value = node.fields[spec.key];
@@ -334,7 +365,7 @@ class _StringMapControl extends StatelessWidget {
     final entries = _entries;
     return InputDecorator(
       decoration: InputDecoration(
-        labelText: label,
+        labelText: floatingLabel ? label : null,
         errorText: errorText,
         filled: false,
         enabledBorder: OutlineInputBorder(
@@ -416,6 +447,7 @@ class StringListEditor extends StatelessWidget {
     required this.controller,
     required this.label,
     required this.errorText,
+    this.floatingLabel = true,
   });
 
   final Node node;
@@ -423,6 +455,7 @@ class StringListEditor extends StatelessWidget {
   final DocumentController controller;
   final String label;
   final String? errorText;
+  final bool floatingLabel;
 
   List<String> get _values {
     final value = node.fields[spec.key];
@@ -440,7 +473,7 @@ class StringListEditor extends StatelessWidget {
     final values = _values;
     return InputDecorator(
       decoration: InputDecoration(
-        labelText: label,
+        labelText: floatingLabel ? label : null,
         errorText: errorText,
         filled: false,
         enabledBorder: OutlineInputBorder(
