@@ -352,8 +352,8 @@ class DocumentController extends ChangeNotifier {
     }
   }
 
-  List<int> exportZip() {
-    if (!canExport) {
+  List<int> exportZip({bool allowIncomplete = false}) {
+    if (!allowIncomplete && !canExport) {
       throw StateError('Cannot export a document with validation issues');
     }
     return buildModuleZip(encodeModule(_root));

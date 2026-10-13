@@ -1,3 +1,5 @@
+import 'package:sodalite_configurator/ui/editor/placeholder_field.dart';
+import 'package:sodalite_configurator/ui/editor/placeholder_keys.dart';
 import 'package:sodalite_configurator/ui/help_copy.dart';
 import 'package:sodalite_configurator/ui/sodalite_buttons.dart';
 import 'package:sodalite_configurator/ui/sodalite_help.dart';
@@ -155,12 +157,8 @@ class _FieldControl extends StatelessWidget {
         floatingLabel: help == null,
       ),
       FieldKind.color => _ColorControl(node: node, spec: spec, controller: controller, label: label, errorText: _error),
-      FieldKind.string || FieldKind.nonEmptyString => SyncedTextField(
-        key: ValueKey('${node.id}-${spec.key}'),
-        value: value is String ? value : '',
-        decoration: decoration,
-        onChanged: (text) => controller.setField(node.id, spec.key, text),
-      ),
+      FieldKind.string ||
+      FieldKind.nonEmptyString => _templateField(value: value is String ? value : '', decoration: decoration),
     };
     if (help == null || (spec.kind == FieldKind.boolean && value is bool)) return control;
     final labelStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(color: SodaliteColors.secondary);
@@ -176,6 +174,25 @@ class _FieldControl extends StatelessWidget {
         ),
         control,
       ],
+    );
+  }
+
+  Widget _templateField({required String value, required InputDecoration decoration}) {
+    final source = placeholderKeys(controller.root, node, spec.key);
+    if (source == null) {
+      return SyncedTextField(
+        key: ValueKey('${node.id}-${spec.key}'),
+        value: value,
+        decoration: decoration,
+        onChanged: (text) => controller.setField(node.id, spec.key, text),
+      );
+    }
+    return PlaceholderKeyField(
+      key: ValueKey('${node.id}-${spec.key}'),
+      value: value,
+      source: source,
+      decoration: decoration,
+      onChanged: (text) => controller.setField(node.id, spec.key, text),
     );
   }
 }

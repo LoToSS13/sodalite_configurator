@@ -7,6 +7,7 @@ import 'package:sodalite_configurator/codec/download.dart';
 import 'package:sodalite_configurator/codec/import_files.dart';
 import 'package:sodalite_configurator/document/document_controller.dart';
 import 'package:sodalite_configurator/persistence/draft_store.dart';
+import 'package:sodalite_configurator/sample/example_module.dart';
 import 'package:sodalite_configurator/schema/catalog.dart';
 import 'package:sodalite_configurator/schema/node.dart';
 import 'package:sodalite_configurator/ui/draft_time.dart';
@@ -83,7 +84,7 @@ class _HomePageState extends State<HomePage> {
                       Text('С чего начнём?', style: Theme.of(context).textTheme.headlineSmall),
                       const SizedBox(height: 8),
                       Text(
-                        'Создайте модуль или\u00a0откройте готовую конфигурацию',
+                        'Создайте модуль, откройте пример или\u00a0готовую конфигурацию',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: SodaliteColors.secondary),
                       ),
                       const SizedBox(height: 24),
@@ -92,6 +93,11 @@ class _HomePageState extends State<HomePage> {
                         runSpacing: 12,
                         children: [
                           SodaliteButton.primary(onPressed: _createModule, label: const Text(UiStrings.createModule)),
+                          SodaliteButton.secondary(
+                            onPressed: _openExample,
+                            icon: const Icon(Icons.auto_stories_outlined, size: 20),
+                            label: const Text('Открыть пример'),
+                          ),
                           SodaliteButton.secondary(
                             onPressed: _openZip,
                             icon: const Icon(Icons.folder_open_outlined, size: 20),
@@ -103,6 +109,11 @@ class _HomePageState extends State<HomePage> {
                             label: const Text(UiStrings.openJson),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Пример «Городские объекты» уже заполнен: пути, подстановки в\u00a0фигурных скобках, поиск и\u00a0создание объектов.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: SodaliteColors.secondary),
                       ),
                     ],
                   ),
@@ -128,6 +139,11 @@ class _HomePageState extends State<HomePage> {
                     ],
                   );
                 },
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Черновики только в\u00a0этом браузере. Другое устройство, другой браузер и\u00a0очистка данных сайта их\u00a0не\u00a0увидят.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: SodaliteColors.secondary),
               ),
               const SizedBox(height: 16),
               FutureBuilder<List<DraftMeta>>(
@@ -158,7 +174,7 @@ class _HomePageState extends State<HomePage> {
                       icon: _query.isEmpty ? Icons.layers_outlined : Icons.search,
                       title: _query.isEmpty ? 'Здесь будут ваши модули' : 'Модули не найдены',
                       message: _query.isEmpty
-                          ? 'Черновики сохраняются в\u00a0этом браузере. К\u00a0ним можно вернуться позже'
+                          ? 'Создайте модуль или\u00a0откройте пример, чтобы он\u00a0появился в\u00a0списке'
                           : 'Попробуйте другое название или\u00a0идентификатор',
                     );
                   }
@@ -252,6 +268,25 @@ class _HomePageState extends State<HomePage> {
         drafts: _drafts,
         draftAlreadySaved: false,
       ),
+    );
+  }
+
+  Future<void> _openExample() async {
+    final example = createExampleModule();
+    if (!mounted) return;
+    final root = await _resolveImportedDraft(example.root);
+    if (root == null || !mounted) return;
+    try {
+      await _drafts.save(root);
+    } catch (_) {
+      await _showImportError(
+        'Не удалось сохранить пример в этом браузере. Проверьте доступность хранилища и попробуйте ещё раз.',
+      );
+      return;
+    }
+    if (!mounted) return;
+    await _openEditor(
+      DocumentController(catalog: Catalog.modulePack(), root: root, drafts: _drafts, importWarnings: example.warnings),
     );
   }
 

@@ -19,6 +19,7 @@ import 'package:sodalite_configurator/ui/editor/json_preview.dart';
 import 'package:sodalite_configurator/ui/editor/panel_divider.dart';
 import 'package:sodalite_configurator/ui/editor/slot_add_button.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
+import 'package:sodalite_configurator/ui/sodalite_dialog.dart';
 import 'package:sodalite_configurator/ui/sodalite_toast.dart';
 
 class EditorPage extends StatefulWidget {
@@ -163,13 +164,43 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
-  void _export() {
+  Future<void> _export() async {
     if (!widget.controller.canExport) {
-      _openIssues();
+      final downloadAnyway = await showSodaliteDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Конфигурация незакончена'),
+          content: SizedBox(
+            width: 440,
+            child: Text(
+              'В модуле ещё есть замечания: ${widget.controller.issues.length}. '
+              'Такой ZIP нельзя загрузить в Sodalite, пока они не будут исправлены. '
+              'Файл можно скачать, чтобы доработать его на другом компьютере.',
+            ),
+          ),
+          actions: [
+            SodaliteButton.secondary(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Скачать всё равно'),
+            ),
+            SodaliteButton.primary(onPressed: () => Navigator.pop(context, false), child: const Text('Доработать')),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (downloadAnyway == true) {
+        _downloadZip(allowIncomplete: true);
+        return;
+      }
+      if (downloadAnyway == false) _openIssues();
       return;
     }
+    _downloadZip();
+  }
+
+  void _downloadZip({bool allowIncomplete = false}) {
     try {
-      final bytes = widget.controller.exportZip();
+      final bytes = widget.controller.exportZip(allowIncomplete: allowIncomplete);
       final slug = widget.controller.root.fields['slug'] as String? ?? 'module';
       widget.download(filename: '$slug-sodalite-module.zip', bytes: bytes);
     } catch (_) {
@@ -440,6 +471,10 @@ class _EditorPageState extends State<EditorPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
+                                if (controller.draftSaveState == DraftSaveState.failed) ...[
+                                  _DraftSaveFailure(onRetry: controller.retryDraftSave),
+                                  const SizedBox(height: 24),
+                                ],
                                 if (controller.hasImportNotes) ...[
                                   _ImportNotesBanner(controller: controller),
                                   const SizedBox(height: 24),
@@ -885,6 +920,41 @@ class _LayerTabsState extends State<_LayerTabs> {
           const SizedBox(height: 16),
           content,
         ],
+      ),
+    );
+  }
+}
+
+class _DraftSaveFailure extends StatelessWidget {
+  const _DraftSaveFailure({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: SodaliteColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: SodaliteColors.errorText),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.error_outline, size: 20, color: SodaliteColors.errorText),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Черновик не записался в этот браузер. Данные есть на экране, но после обновления страницы могут пропасть.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+            const SizedBox(width: 12),
+            SodaliteButton.secondary(onPressed: onRetry, child: const Text('Повторить')),
+          ],
+        ),
       ),
     );
   }
