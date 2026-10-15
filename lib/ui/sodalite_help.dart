@@ -284,50 +284,55 @@ class _SodaliteHelpButtonState extends State<SodaliteHelpButton> with SingleTick
   }
 
   Widget _overlay(BuildContext context) {
-    return _AnchoredHelpCard(
-      link: _link,
-      buttonKey: _buttonKey,
-      child: MouseRegion(
-        onEnter: (_) => _setOverCard(true),
-        onExit: (_) => _setOverCard(false),
-        child: FadeTransition(
-          opacity: _curve,
-          child: ScaleTransition(
-            scale: _scale,
-            alignment: Alignment.bottomCenter,
-            child: ExcludeSemantics(
-              child: SelectionArea(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: SodaliteColors.text,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 42,
-                          offset: const Offset(0, 4),
-                        ),
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _HelpLine(label: 'Что это', body: widget.text.what),
-                          const SizedBox(height: 8),
-                          _HelpLine(label: 'Где видно', body: widget.text.where),
-                          const SizedBox(height: 8),
-                          _HelpLine(label: 'Пример', body: widget.text.example),
+    // The overlay gives this child tight full-size constraints. Without a
+    // shrink-wrapping parent the card paints as a sheet the size of the pane.
+    return Align(
+      alignment: Alignment.topLeft,
+      child: _AnchoredHelpCard(
+        link: _link,
+        buttonKey: _buttonKey,
+        child: MouseRegion(
+          onEnter: (_) => _setOverCard(true),
+          onExit: (_) => _setOverCard(false),
+          child: FadeTransition(
+            opacity: _curve,
+            child: ScaleTransition(
+              scale: _scale,
+              alignment: Alignment.bottomCenter,
+              child: ExcludeSemantics(
+                child: SelectionArea(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: SodaliteColors.text,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 42,
+                            offset: const Offset(0, 4),
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
                         ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _HelpLine(label: 'Что это', body: widget.text.what),
+                            const SizedBox(height: 8),
+                            _HelpLine(label: 'Где видно', body: widget.text.where),
+                            const SizedBox(height: 8),
+                            _HelpLine(label: 'Пример', body: widget.text.example),
+                          ],
+                        ),
                       ),
                     ),
                   ),
