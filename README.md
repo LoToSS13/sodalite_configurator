@@ -19,7 +19,7 @@ HTML renderer was the original intent, but Flutter 3.38+ dropped the `--web-rend
 
 ## Integrations
 
-The home page block «Интеграции» stores a Consul address and API key, and the Jasper connection. Jasper login uses the Identity authorization-code flow in the browser. The access token is refreshed from a button in that block. The XSD list loads after login, when the editor opens, and from «Обновить список XSD». A ready module can be written to Consul at `apps/{slug}/` in one transaction. An unfinished module is not uploaded. The browser can call these servers only if they allow this site (CORS).
+The home page block «Интеграции» stores a Consul address and API key, and the Jasper connection. Jasper login uses the Identity authorization-code flow in the browser. The access token is refreshed from a button in that block. The XSD list loads after login, when the editor opens, and from «Обновить список XSD». An empty list is followed by `GET /api/v1/rights`: the notice says the client has no creation schemas and reports the viewing rights from that response. A ready module can be written to Consul at `apps/{slug}/` in one transaction. «Из Consul» on the home page reads that folder back into a draft and uses the same replace-or-copy prompt as a ZIP. An unfinished module is not uploaded. The browser can call these servers only if they allow this site (CORS).
 
 Home also opens an existing zip (or a set of those JSON files). Incomplete imports stay editable. A ZIP of an unfinished module asks for confirmation; Consul upload stays blocked until the tree is valid. Drafts autosave in the browser `localStorage` and do not clear on download. The JSON panel is a read-only preview of the current tree, not a second editor.
 

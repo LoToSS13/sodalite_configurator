@@ -156,6 +156,91 @@ XsdEntry? _entryFrom(Object? item) {
   return XsdEntry(value: value, label: label);
 }
 
+class JasperRight {
+  const JasperRight({required this.name, required this.alias, required this.type});
+
+  final String name;
+  final String alias;
+  final String type;
+}
+
+class JasperRights {
+  const JasperRights({required this.schemeName, required this.schemeAlias, required this.rights});
+
+  final String schemeName;
+  final String schemeAlias;
+  final List<JasperRight> rights;
+}
+
+Future<JasperRights> fetchJasperRights({
+  required IntegrationHttp http,
+  required String apiUrl,
+  required String accessToken,
+}) async {
+  final result = await http.send(
+    method: 'GET',
+    url: Uri.parse('${jasperApiPrefix(apiUrl)}/rights'),
+    headers: {'Authorization': 'Bearer ${accessToken.trim()}', 'Accept': 'application/json'},
+  );
+  if (result.status == 401 || result.status == 403) {
+    throw IntegrationException('Jasper не принял токен. Обновите его или войдите снова.');
+  }
+  if (result.status == 404) {
+    throw IntegrationException('Права клиента не найдены. Проверьте адрес Jasper: к нему добавляется /api/v1/rights.');
+  }
+  if (result.status < 200 || result.status >= 300) {
+    final brief = briefBody(result.body);
+    throw IntegrationException('Jasper ответил ${result.status}.${brief.isEmpty ? '' : ' $brief'}');
+  }
+  return parseJasperRights(result.body);
+}
+
+JasperRights parseJasperRights(String body) {
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(body);
+  } catch (_) {
+    throw IntegrationException('Jasper вернул не JSON с правами клиента.');
+  }
+  if (decoded is List) {
+    return JasperRights(schemeName: '', schemeAlias: '', rights: _rightsFrom(decoded));
+  }
+  if (decoded is! Map) throw IntegrationException('Jasper вернул неожиданный ответ прав.');
+  final raw = decoded['rights'] ?? decoded['Rights'];
+  if (raw is! List) throw IntegrationException('В ответе Jasper нет списка прав.');
+  return JasperRights(
+    schemeName: _text(decoded['name']),
+    schemeAlias: _text(decoded['alias']),
+    rights: _rightsFrom(raw),
+  );
+}
+
+/// Empty XSD list means no creation schemas. `/rights` reports viewing rights.
+String emptyXsdRightsMessage(JasperRights rights) {
+  const lead = 'Список XSD пуст: клиенту не назначены схемы на вкладке «Создание».';
+  if (rights.rights.isEmpty) return '$lead Прав на просмотр тоже нет.';
+  final reading = rights.rights.where((right) => right.type.isEmpty || right.type.toLowerCase() == 'reading').length;
+  final other = rights.rights.length - reading;
+  final scheme = rights.schemeName.isNotEmpty ? rights.schemeName : rights.schemeAlias;
+  final schemeText = scheme.isEmpty ? '' : ' Схема «$scheme».';
+  if (other == 0) return '$lead Прав на просмотр: $reading.$schemeText';
+  return '$lead Прав на просмотр: $reading. Других прав: $other.$schemeText';
+}
+
+List<JasperRight> _rightsFrom(List<Object?> raw) {
+  final rights = <JasperRight>[];
+  for (final item in raw) {
+    if (item is! Map) continue;
+    final name = _text(item['name']);
+    final alias = _text(item['alias']);
+    if (name.isEmpty && alias.isEmpty) continue;
+    rights.add(JasperRight(name: name, alias: alias, type: _text(item['type'])));
+  }
+  return rights;
+}
+
+String _text(Object? value) => value is String ? value.trim() : '';
+
 String _tokenFailure(int status, String body) {
   try {
     final decoded = jsonDecode(body);

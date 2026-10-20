@@ -219,7 +219,7 @@ class _IntegrationsPanelState extends State<IntegrationsPanel> {
         Text('Consul', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Text(
-          'Кнопка «В Consul» в редакторе записывает готовый модуль одним сохранением. Незаконченный модуль туда не уходит.',
+          'Кнопка «В Consul» в редакторе записывает готовый модуль одним сохранением. «Из Consul» на главной читает папку apps/{идентификатор}/ в черновик. Незаконченный модуль в Consul не уходит.',
           style: body,
         ),
         const SizedBox(height: 16),

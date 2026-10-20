@@ -8,6 +8,8 @@ import 'package:sodalite_configurator/integrations/service_urls.dart';
 
 final _slugPattern = RegExp(r'^[a-z0-9][a-z0-9_-]*$');
 
+bool isConsulSlug(String slug) => _slugPattern.hasMatch(slug.trim());
+
 List<String> writtenConsulFiles(ModuleFiles files) => [
   'app.json',
   'base_layer.json',
@@ -24,7 +26,7 @@ List<String> removedConsulFiles(ModuleFiles files) => [
 /// One Consul transaction, so a failed write does not leave half a module.
 List<Map<String, Object?>> consulTransaction(ModuleFiles files) {
   final slug = files.slug.trim();
-  if (!_slugPattern.hasMatch(slug)) {
+  if (!isConsulSlug(slug)) {
     throw IntegrationException('Идентификатор модуля не подходит для пути Consul.');
   }
   final prefix = 'apps/$slug';

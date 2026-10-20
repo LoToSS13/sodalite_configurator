@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:sodalite_configurator/codec/module_codec.dart';
+import 'package:sodalite_configurator/integrations/consul_read.dart' as consul_read;
 import 'package:sodalite_configurator/integrations/consul_upload.dart';
 import 'package:sodalite_configurator/integrations/http_client.dart';
 import 'package:sodalite_configurator/integrations/integration_exception.dart';
@@ -233,12 +234,12 @@ class IntegrationController extends ChangeNotifier {
     final requestedUrl = _settings.jasperApiUrl;
     try {
       final list = await fetchJasperXsds(http: _http, apiUrl: requestedUrl, accessToken: _settings.accessToken);
-      if (_settings.jasperApiUrl.trim() != requestedUrl.trim()) return;
+      if (_settings.jasperApiUrl.trim() != requestedUrl.trim() || !_settings.signedIn) return;
+      final notice = list.isEmpty ? await _emptyXsdNotice(requestedUrl) : 'Список XSD обновлён: ${list.length}.';
+      if (notice == null || _settings.jasperApiUrl.trim() != requestedUrl.trim() || !_settings.signedIn) return;
       _settings = _settings.copyWith(xsds: list, xsdsFetchedAt: DateTime.now().toUtc());
       _store.write(_settings);
-      _notice = list.isEmpty
-          ? 'Jasper вернул пустой список XSD. Проверьте права клиента.'
-          : 'Список XSD обновлён: ${list.length}.';
+      _notice = notice;
       _noticeIsError = list.isEmpty;
     } catch (error) {
       if (_settings.jasperApiUrl.trim() != requestedUrl.trim()) {
@@ -251,6 +252,21 @@ class IntegrationController extends ChangeNotifier {
       _busyXsds = false;
       notifyListeners();
     }
+  }
+
+  Future<List<String>> listConsulModules() {
+    _requireConsul();
+    return consul_read.listConsulModuleSlugs(http: _http, consulUrl: _settings.consulUrl, token: _settings.consulToken);
+  }
+
+  Future<consul_read.ConsulModuleFolder> readConsulModule(String slug) {
+    _requireConsul();
+    return consul_read.readConsulModule(
+      http: _http,
+      consulUrl: _settings.consulUrl,
+      token: _settings.consulToken,
+      slug: slug,
+    );
   }
 
   Future<void> uploadToConsul(ModuleFiles files) async {
@@ -277,6 +293,23 @@ class IntegrationController extends ChangeNotifier {
     } finally {
       _busyUpload = false;
       notifyListeners();
+    }
+  }
+
+  void _requireConsul() {
+    if (!_settings.consulReady) {
+      throw IntegrationException('Укажите адрес Consul и ключ API.');
+    }
+  }
+
+  Future<String?> _emptyXsdNotice(String requestedUrl) async {
+    try {
+      final rights = await fetchJasperRights(http: _http, apiUrl: requestedUrl, accessToken: _settings.accessToken);
+      if (_settings.jasperApiUrl.trim() != requestedUrl.trim() || !_settings.signedIn) return null;
+      return emptyXsdRightsMessage(rights);
+    } catch (error) {
+      if (_settings.jasperApiUrl.trim() != requestedUrl.trim()) return null;
+      return 'Список XSD пуст. ${_message(error, 'Права клиента запросить не удалось.')}';
     }
   }
 

@@ -14,8 +14,12 @@ import 'package:sodalite_configurator/ui/draft_time.dart';
 import 'package:sodalite_configurator/ui/editor/editor_page.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
 import 'package:sodalite_configurator/ui/sodalite_search_field.dart';
+import 'package:sodalite_configurator/integrations/integration_controller.dart';
+import 'package:sodalite_configurator/integrations/integration_exception.dart';
 import 'package:sodalite_configurator/ui/integrations/integrations_panel.dart';
+import 'package:sodalite_configurator/ui/integrations/integrations_scope.dart';
 import 'package:sodalite_configurator/ui/sodalite_dialog.dart';
+import 'package:sodalite_configurator/ui/sodalite_select.dart';
 
 typedef PickZipBytesFn = Future<List<int>?> Function();
 typedef PickJsonFilesFn = Future<Map<String, String>?> Function();
@@ -103,6 +107,11 @@ class _HomePageState extends State<HomePage> {
                             onPressed: _openZip,
                             icon: const Icon(Icons.folder_open_outlined, size: 20),
                             label: const Text(UiStrings.openZip),
+                          ),
+                          SodaliteButton.secondary(
+                            onPressed: _openConsul,
+                            icon: const Icon(Icons.cloud_outlined, size: 20),
+                            label: const Text('Из Consul'),
                           ),
                           SodaliteButton.ghost(
                             onPressed: _openJson,
@@ -298,17 +307,35 @@ class _HomePageState extends State<HomePage> {
     return bytes == null ? null : importZip(bytes, id: newNodeId);
   });
 
+  Future<void> _openConsul() async {
+    final integrations = Integrations.read(context);
+    if (integrations == null || !integrations.settings.consulReady) {
+      await _showImportError(
+        'Укажите адрес Consul и ключ API в блоке «Интеграции». После этого модуль можно открыть из папки apps/.',
+        title: 'Нужен Consul',
+      );
+      return;
+    }
+    if (!mounted) return;
+    final result = await showSodaliteDialog<ImportResult>(
+      context: context,
+      builder: (context) => _ConsulOpenDialog(integrations: integrations),
+    );
+    if (result == null || !mounted) return;
+    await _importModule(() async => result);
+  }
+
   Future<void> _openJson() => _importModule(() async {
     final files = await (widget.pickJsonFiles ?? _pickJsonFiles)();
     return files == null ? null : importLooseFiles(files, id: newNodeId);
   });
 
-  Future<void> _showImportError(String message) async {
+  Future<void> _showImportError(String message, {String title = UiStrings.importFailed}) async {
     if (!mounted) return;
     await showSodaliteDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text(UiStrings.importFailed),
+        title: Text(title),
         scrollable: true,
         content: SelectableText(message),
         actions: [SodaliteButton.primary(onPressed: () => Navigator.pop(context), child: const Text('Понятно'))],
@@ -532,6 +559,161 @@ class _SlugDialogState extends State<_SlugDialog> {
       actions: [
         SodaliteButton.secondary(onPressed: () => Navigator.pop(context), child: const Text(UiStrings.cancel)),
         SodaliteButton.primary(onPressed: _valid ? _submit : null, child: const Text(UiStrings.createModule)),
+      ],
+    );
+  }
+}
+
+class _ConsulOpenDialog extends StatefulWidget {
+  const _ConsulOpenDialog({required this.integrations});
+
+  final IntegrationController integrations;
+
+  @override
+  State<_ConsulOpenDialog> createState() => _ConsulOpenDialogState();
+}
+
+class _ConsulOpenDialogState extends State<_ConsulOpenDialog> {
+  final TextEditingController _controller = TextEditingController();
+  static final RegExp _pattern = RegExp(r'^[a-z0-9][a-z0-9_-]*$');
+  List<String>? _slugs;
+  String? _listError;
+  String? _picked;
+  String? _error;
+  var _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSlugs();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String get _slug => _controller.text.trim();
+
+  bool get _valid => _pattern.hasMatch(_slug);
+
+  Future<void> _loadSlugs() async {
+    try {
+      final slugs = await widget.integrations.listConsulModules();
+      if (!mounted) return;
+      setState(() => _slugs = slugs);
+    } on IntegrationException catch (error) {
+      if (!mounted) return;
+      setState(() => _listError = error.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _listError = 'Не удалось получить список модулей. Идентификатор можно ввести вручную.');
+    }
+  }
+
+  Future<void> _open() async {
+    if (!_valid || _busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final folder = await widget.integrations.readConsulModule(_slug);
+      if (!mounted) return;
+      final result = importLooseFiles(
+        folder.files,
+        slug: _slug,
+        id: newNodeId,
+        extraWarnings: zipExtraFileWarnings([
+          for (final name in folder.files.keys) 'apps/$_slug/$name',
+          for (final name in folder.ignored) 'apps/$_slug/$name',
+        ], prefix: 'apps/$_slug'),
+      );
+      Navigator.of(context).pop(result);
+    } on IntegrationException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = error.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = 'Не удалось прочитать модуль из Consul.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final secondary = theme.textTheme.bodyMedium?.copyWith(color: SodaliteColors.secondary);
+    return AlertDialog(
+      title: const Text('Из Consul'),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Модуль читается из apps/{идентификатор}/ и открывается как черновик.', style: secondary),
+            const SizedBox(height: 16),
+            if (_slugs == null && _listError == null)
+              Text('Смотрим папки apps/…', style: secondary)
+            else if (_listError != null)
+              Text(_listError!, style: theme.textTheme.bodyMedium?.copyWith(color: SodaliteColors.errorText))
+            else if (_slugs!.isEmpty)
+              Text('Папок apps/ в ответе нет. Идентификатор можно ввести вручную.', style: secondary)
+            else ...[
+              SodaliteSelect<String>(
+                value: _picked,
+                values: _slugs!,
+                labelOf: (slug) => slug,
+                decoration: const InputDecoration(
+                  labelText: 'Модули в Consul',
+                  helperText: 'Список папок apps/. Ниже можно ввести другой идентификатор.',
+                ),
+                onChanged: _busy
+                    ? null
+                    : (slug) {
+                        if (slug == null) return;
+                        _controller.text = slug;
+                        setState(() => _picked = slug);
+                      },
+              ),
+            ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              enabled: !_busy,
+              decoration: InputDecoration(
+                labelText: UiStrings.pathLabel('slug'),
+                hintText: 'Например, city_objects',
+                helperText: _slug.isEmpty || _valid ? 'Например, city_objects. Папка apps/city_objects/.' : null,
+                errorText: _slug.isEmpty || _valid
+                    ? null
+                    : 'Нужны строчные латинские буквы, цифры, дефис и нижнее подчёркивание. Например, city_objects',
+              ),
+              onChanged: (value) {
+                final slug = value.trim();
+                setState(() => _picked = _slugs != null && _slugs!.contains(slug) ? slug : null);
+              },
+              onSubmitted: (_) => _open(),
+            ),
+            if (_busy) ...[const SizedBox(height: 12), Text('Читаем apps/$_slug/…', style: secondary)],
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!, style: theme.textTheme.bodyMedium?.copyWith(color: SodaliteColors.errorText)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        SodaliteButton.secondary(onPressed: () => Navigator.pop(context), child: const Text(UiStrings.cancel)),
+        SodaliteButton.primary(onPressed: _valid && !_busy ? _open : null, child: const Text('Открыть')),
       ],
     );
   }
