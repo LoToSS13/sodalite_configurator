@@ -6,10 +6,10 @@ IntegrationStore createIntegrationStore() => _LocalIntegrationStore();
 
 class _LocalIntegrationStore implements IntegrationStore {
   @override
-  IntegrationSettings read() => IntegrationSettings.decode(window.localStorage.getItem(integrationStorageKey));
+  IntegrationCatalog read() => IntegrationCatalog.decode(window.localStorage.getItem(integrationStorageKey));
 
   @override
-  void write(IntegrationSettings settings) {
-    window.localStorage.setItem(integrationStorageKey, settings.encode());
+  void write(IntegrationCatalog catalog) {
+    window.localStorage.setItem(integrationStorageKey, catalog.encode());
   }
 }

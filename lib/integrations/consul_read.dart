@@ -13,6 +13,13 @@ class ConsulModuleFolder {
   final List<String> ignored;
 }
 
+class ConsulFolderSnapshot {
+  const ConsulFolderSnapshot({required this.files, this.title});
+
+  final List<String> files;
+  final String? title;
+}
+
 Future<List<String>> listConsulModuleSlugs({
   required IntegrationHttp http,
   required String consulUrl,
@@ -50,6 +57,26 @@ Future<ConsulModuleFolder> readConsulModule({
   return parseConsulModule(result.body, slug: folder);
 }
 
+Future<ConsulFolderSnapshot?> inspectConsulModule({
+  required IntegrationHttp http,
+  required String consulUrl,
+  required String token,
+  required String slug,
+}) async {
+  final folder = slug.trim();
+  if (!isConsulSlug(folder)) {
+    throw IntegrationException('Идентификатор модуля не подходит для пути Consul. Например, city_objects');
+  }
+  final result = await http.send(
+    method: 'GET',
+    url: _kvUri(consulUrl, 'apps/$folder/', {'recurse': 'true'}),
+    headers: _headers(token),
+  );
+  if (result.status == 404) return null;
+  _reject(result, 'Не удалось прочитать модуль из Consul.');
+  return snapshotConsulModule(result.body, slug: folder);
+}
+
 List<String> parseConsulModuleSlugs(String body) {
   final decoded = _jsonList(body, 'Consul вернул неожиданный список модулей.');
   final slugs = <String>{};
@@ -62,7 +89,34 @@ List<String> parseConsulModuleSlugs(String body) {
 }
 
 ConsulModuleFolder parseConsulModule(String body, {required String slug}) {
-  final decoded = _jsonList(body, 'Consul вернул неожиданный модуль.');
+  final collected = _collect(_jsonList(body, 'Consul вернул неожиданный модуль.'), slug);
+  if (collected.files.isEmpty) {
+    throw IntegrationException('В apps/$slug/ нет файлов модуля.');
+  }
+  return ConsulModuleFolder(files: collected.files, ignored: collected.ignored);
+}
+
+ConsulFolderSnapshot? snapshotConsulModule(String body, {required String slug}) {
+  final collected = _collect(_jsonList(body, 'Consul вернул неожиданный модуль.'), slug);
+  if (collected.files.isEmpty) return null;
+  const order = ['app.json', 'base_layer.json', 'additional_layers.json', 'object_creation.json', 'search.json'];
+  return ConsulFolderSnapshot(
+    files: [
+      for (final name in order)
+        if (collected.files.containsKey(name)) name,
+    ],
+    title: _moduleTitle(collected.files['app.json']),
+  );
+}
+
+class _Collected {
+  const _Collected(this.files, this.ignored);
+
+  final Map<String, String> files;
+  final List<String> ignored;
+}
+
+_Collected _collect(List<Object?> decoded, String slug) {
   final prefix = 'apps/$slug/';
   final files = <String, String>{};
   final ignored = <String>[];
@@ -78,10 +132,17 @@ ConsulModuleFolder parseConsulModule(String body, {required String slug}) {
     }
     files[relative] = _decodeValue(relative, item['Value']);
   }
-  if (files.isEmpty) {
-    throw IntegrationException('В apps/$slug/ нет файлов модуля.');
-  }
-  return ConsulModuleFolder(files: files, ignored: ignored);
+  return _Collected(files, ignored);
+}
+
+String? _moduleTitle(String? appJson) {
+  if (appJson == null) return null;
+  try {
+    final decoded = jsonDecode(appJson);
+    final title = decoded is Map ? decoded['title'] : null;
+    if (title is String && title.trim().isNotEmpty) return title.trim();
+  } catch (_) {}
+  return null;
 }
 
 Uri _kvUri(String consulUrl, String key, Map<String, String> query) {

@@ -6,9 +6,9 @@ import 'package:sodalite_configurator/integrations/integration_store_stub.dart'
 const integrationStorageKey = 'sodalite-configurator.integrations';
 
 abstract class IntegrationStore {
-  IntegrationSettings read();
+  IntegrationCatalog read();
 
-  void write(IntegrationSettings settings);
+  void write(IntegrationCatalog catalog);
 }
 
 IntegrationStore createIntegrationStore() => impl.createIntegrationStore();

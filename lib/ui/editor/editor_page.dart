@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:sodalite_configurator/codec/module_codec.dart';
+import 'package:sodalite_configurator/integrations/consul_read.dart';
 import 'package:sodalite_configurator/integrations/consul_upload.dart';
+import 'package:sodalite_configurator/integrations/integration_controller.dart';
 import 'package:sodalite_configurator/integrations/integration_exception.dart';
 import 'package:sodalite_configurator/ui/integrations/integrations_panel.dart';
 import 'package:sodalite_configurator/ui/integrations/integrations_scope.dart';
@@ -225,7 +227,7 @@ class _EditorPageState extends State<EditorPage> {
     final integrations = Integrations.read(context);
     if (integrations == null) return;
     if (!integrations.settings.consulReady) {
-      integrations.explain('Чтобы загрузить модуль, укажите адрес Consul и ключ API.');
+      integrations.explain('Чтобы загрузить модуль, укажите URL и Token Consul.');
       if (!fromDialog && mounted) await _openIntegrations();
       return;
     }
@@ -251,25 +253,9 @@ class _EditorPageState extends State<EditorPage> {
       return;
     }
     final files = encodeModule(widget.controller.root);
-    final removed = removedConsulFiles(files);
-    final removal = removed.isEmpty ? '' : ' Если ${removed.join(' и ')} уже есть в Consul, они будут удалены.';
     final confirmed = await showSodaliteDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Загрузить в Consul'),
-        content: SizedBox(
-          width: 440,
-          child: Text(
-            'Модуль ${files.slug} будет записан в ${integrations.settings.consulUrl.trim()} '
-            'по пути apps/${files.slug}/. Файлы: ${writtenConsulFiles(files).join(', ')}.$removal '
-            'Запись идёт одним сохранением.',
-          ),
-        ),
-        actions: [
-          SodaliteButton.secondary(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
-          SodaliteButton.primary(onPressed: () => Navigator.pop(context, true), child: const Text('Загрузить')),
-        ],
-      ),
+      builder: (context) => _ConsulUploadDialog(integrations: integrations, files: files),
     );
     if (confirmed != true || !mounted) return;
     try {
@@ -1167,5 +1153,87 @@ void _ensureNodeVisible(BuildContext context, String nodeId) {
   final found = match;
   if (found != null) {
     Scrollable.ensureVisible(found, alignment: 0.1, duration: const Duration(milliseconds: 200));
+  }
+}
+
+class _ConsulUploadDialog extends StatefulWidget {
+  const _ConsulUploadDialog({required this.integrations, required this.files});
+
+  final IntegrationController integrations;
+  final ModuleFiles files;
+
+  @override
+  State<_ConsulUploadDialog> createState() => _ConsulUploadDialogState();
+}
+
+class _ConsulUploadDialogState extends State<_ConsulUploadDialog> {
+  ConsulFolderSnapshot? _current;
+  String? _readError;
+  var _checking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final current = await widget.integrations.inspectConsulModule(widget.files.slug);
+      if (!mounted) return;
+      setState(() {
+        _current = current;
+        _checking = false;
+      });
+    } on IntegrationException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _readError = error.message;
+        _checking = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _readError = 'Не удалось прочитать текущую папку.';
+        _checking = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final files = widget.files;
+    final removed = removedConsulFiles(files);
+    final removal = removed.isEmpty ? '' : ' Если ${removed.join(' и ')} уже есть в Consul, они будут удалены.';
+    final contour = widget.integrations.activeContourName;
+    final where = contour == null
+        ? widget.integrations.settings.consulUrl.trim()
+        : 'контур «$contour», ${widget.integrations.settings.consulUrl.trim()}';
+    final current = _current;
+    final existing = _checking
+        ? 'Смотрим, что уже лежит в apps/${files.slug}/…'
+        : _readError != null
+        ? 'Текущую папку прочитать не удалось. $_readError Запись всё равно заменит файлы по этому пути.'
+        : current == null
+        ? 'Папки apps/${files.slug}/ в Consul пока нет.'
+        : 'Сейчас там${current.title == null ? '' : ' «${current.title}»'}. Файлы: ${current.files.join(', ')}. Запись заменит их.';
+    return AlertDialog(
+      title: const Text('Загрузить в Consul'),
+      content: SizedBox(
+        width: 440,
+        child: Text(
+          'Модуль ${files.slug} будет записан в $where по пути apps/${files.slug}/. '
+          'Файлы: ${writtenConsulFiles(files).join(', ')}.$removal '
+          'Запись идёт одним сохранением. $existing',
+        ),
+      ),
+      actions: [
+        SodaliteButton.secondary(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+        SodaliteButton.primary(
+          onPressed: _checking ? null : () => Navigator.pop(context, true),
+          child: const Text('Загрузить'),
+        ),
+      ],
+    );
   }
 }

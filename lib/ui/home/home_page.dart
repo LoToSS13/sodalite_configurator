@@ -19,6 +19,7 @@ import 'package:sodalite_configurator/integrations/integration_exception.dart';
 import 'package:sodalite_configurator/ui/integrations/integrations_panel.dart';
 import 'package:sodalite_configurator/ui/integrations/integrations_scope.dart';
 import 'package:sodalite_configurator/ui/sodalite_dialog.dart';
+import 'package:sodalite_configurator/ui/sodalite_toast.dart';
 import 'package:sodalite_configurator/ui/sodalite_select.dart';
 
 typedef PickZipBytesFn = Future<List<int>?> Function();
@@ -234,10 +235,20 @@ class _HomePageState extends State<HomePage> {
                                     title: Text(draft.title, style: Theme.of(context).textTheme.titleMedium),
                                     subtitle: Text('${draft.slug} · ${formatDraftWhen(draft.updatedAt)}'),
                                     onTap: () => _openDraft(draft.slug),
-                                    trailing: SodaliteIconButton(
-                                      tooltip: UiStrings.deleteDraft,
-                                      onPressed: () => _deleteDraft(draft.slug),
-                                      icon: const Icon(Icons.delete_outline),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SodaliteIconButton(
+                                          tooltip: 'Дублировать',
+                                          onPressed: () => _duplicateDraft(draft.slug),
+                                          icon: const Icon(Icons.copy_outlined),
+                                        ),
+                                        SodaliteIconButton(
+                                          tooltip: UiStrings.deleteDraft,
+                                          onPressed: () => _deleteDraft(draft.slug),
+                                          icon: const Icon(Icons.delete_outline),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -311,7 +322,7 @@ class _HomePageState extends State<HomePage> {
     final integrations = Integrations.read(context);
     if (integrations == null || !integrations.settings.consulReady) {
       await _showImportError(
-        'Укажите адрес Consul и ключ API в блоке «Интеграции». После этого модуль можно открыть из папки apps/.',
+        'Укажите URL и Token в блоке «Интеграции». После этого модуль можно открыть из папки apps/.',
         title: 'Нужен Consul',
       );
       return;
@@ -414,12 +425,26 @@ class _HomePageState extends State<HomePage> {
     );
     if (choice == null || !mounted) return null;
     if (choice == 'replace') return root;
-    var candidate = '$slug-copy';
-    var suffix = 2;
-    while (await _drafts.load(candidate) != null) {
-      candidate = '$slug-copy-${suffix++}';
+    final taken = {for (final draft in await _drafts.list()) draft.slug};
+    return root.copyWith(fields: {...root.fields, 'slug': nextCopySlug(slug, taken)});
+  }
+
+  Future<void> _duplicateDraft(String slug) async {
+    final root = await _drafts.load(slug);
+    if (root == null || !mounted) return;
+    final taken = {for (final draft in await _drafts.list()) draft.slug};
+    final copySlug = nextCopySlug(slug, taken);
+    try {
+      await _drafts.save(root.copyWith(fields: {...root.fields, 'slug': copySlug}));
+    } catch (_) {
+      await _showImportError(
+        'Не удалось сохранить копию в этом браузере. Проверьте доступность хранилища и попробуйте ещё раз.',
+      );
+      return;
     }
-    return root.copyWith(fields: {...root.fields, 'slug': candidate});
+    if (!mounted) return;
+    setState(_reloadDrafts);
+    SodaliteToast.show(context, message: 'Создана копия «$copySlug»');
   }
 
   Future<void> _openDraft(String slug) async {
@@ -717,6 +742,15 @@ class _ConsulOpenDialogState extends State<_ConsulOpenDialog> {
       ],
     );
   }
+}
+
+String nextCopySlug(String slug, Set<String> taken) {
+  var candidate = '$slug-copy';
+  var suffix = 2;
+  while (taken.contains(candidate)) {
+    candidate = '$slug-copy-${suffix++}';
+  }
+  return candidate;
 }
 
 class _EmptyDrafts extends StatelessWidget {

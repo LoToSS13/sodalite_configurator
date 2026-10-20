@@ -207,12 +207,17 @@ class _FieldControl extends StatelessWidget {
       listenable: integrations,
       builder: (context, _) {
         final entries = integrations.settings.xsds;
+        final missingFromList =
+            value.isNotEmpty && entries.isNotEmpty && entries.every((entry) => entry.value != value);
         final text = _xsdText(
           value,
-          entries.isEmpty &&
-                  integrations.settings.signedIn &&
-                  decoration.helperText == null &&
-                  decoration.errorText == null
+          decoration.errorText != null
+              ? decoration
+              : missingFromList
+              ? decoration.copyWith(
+                  helperText: 'Этого пути нет в списке Jasper. Его можно оставить, экспорт это не запрещает.',
+                )
+              : entries.isEmpty && integrations.settings.signedIn && decoration.helperText == null
               ? decoration.copyWith(helperText: 'Список Jasper пуст. Обновите его в «Интеграциях».')
               : decoration,
         );

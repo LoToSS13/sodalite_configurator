@@ -102,34 +102,135 @@ class IntegrationSettings {
     'xsdsFetchedAt': xsdsFetchedAt?.toUtc().toIso8601String(),
   };
 
-  static IntegrationSettings decode(String? raw) {
-    if (raw == null || raw.isEmpty) return empty;
+  String encode() => jsonEncode(toJson());
+
+  static IntegrationSettings _fromMap(Map<dynamic, dynamic> decoded) {
+    return IntegrationSettings(
+      consulUrl: _string(decoded['consulUrl']),
+      consulToken: _string(decoded['consulToken']),
+      jasperApiUrl: _string(decoded['jasperApiUrl']),
+      identityUrl: _string(decoded['identityUrl']),
+      clientId: _string(decoded['clientId']),
+      clientSecret: _string(decoded['clientSecret']),
+      scope: _string(decoded['scope']),
+      accessToken: _string(decoded['accessToken']),
+      refreshToken: _string(decoded['refreshToken']),
+      accessExpiresAt: _date(decoded['accessExpiresAt']),
+      xsds: [
+        for (final item in decoded['xsds'] is List ? decoded['xsds'] as List : const [])
+          if (XsdEntry.fromJson(item) case final entry?) entry,
+      ],
+      xsdsFetchedAt: _date(decoded['xsdsFetchedAt']),
+    );
+  }
+}
+
+class IntegrationContour {
+  const IntegrationContour({required this.id, required this.name, required this.settings});
+
+  final String id;
+  final String name;
+  final IntegrationSettings settings;
+
+  IntegrationContour copyWith({String? name, IntegrationSettings? settings}) {
+    return IntegrationContour(id: id, name: name ?? this.name, settings: settings ?? this.settings);
+  }
+
+  Map<String, Object?> toJson() => {'id': id, 'name': name, 'settings': settings.toJson()};
+
+  static IntegrationContour? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final id = json['id'];
+    final name = json['name'];
+    final settings = json['settings'];
+    if (id is! String || id.trim().isEmpty || name is! String || name.trim().isEmpty || settings is! Map) return null;
+    return IntegrationContour(id: id.trim(), name: name.trim(), settings: IntegrationSettings._fromMap(settings));
+  }
+}
+
+class IntegrationCatalog {
+  const IntegrationCatalog({required this.activeId, required this.contours});
+
+  final String? activeId;
+  final List<IntegrationContour> contours;
+
+  static const empty = IntegrationCatalog(activeId: null, contours: []);
+
+  IntegrationContour? get active {
+    for (final contour in contours) {
+      if (contour.id == activeId) return contour;
+    }
+    return null;
+  }
+
+  IntegrationSettings get settings => active?.settings ?? IntegrationSettings.empty;
+
+  IntegrationCatalog select(String id) => IntegrationCatalog(activeId: id, contours: contours);
+
+  IntegrationCatalog add(IntegrationContour contour) {
+    return IntegrationCatalog(activeId: contour.id, contours: [...contours, contour]);
+  }
+
+  IntegrationCatalog remove(String id) {
+    final next = [
+      for (final contour in contours)
+        if (contour.id != id) contour,
+    ];
+    final nextActive = activeId == id ? (next.isEmpty ? null : next.first.id) : activeId;
+    return IntegrationCatalog(activeId: nextActive, contours: next);
+  }
+
+  IntegrationCatalog updating(String id, {String? name, IntegrationSettings? settings}) {
+    return IntegrationCatalog(
+      activeId: activeId,
+      contours: [
+        for (final contour in contours)
+          if (contour.id == id) contour.copyWith(name: name, settings: settings) else contour,
+      ],
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    'activeId': activeId,
+    'contours': [for (final contour in contours) contour.toJson()],
+  };
+
+  String encode() => jsonEncode(toJson());
+
+  static IntegrationCatalog decode(String? raw) {
+    if (raw == null || raw.isEmpty) return _initial();
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is! Map) return empty;
-      return IntegrationSettings(
-        consulUrl: _string(decoded['consulUrl']),
-        consulToken: _string(decoded['consulToken']),
-        jasperApiUrl: _string(decoded['jasperApiUrl']),
-        identityUrl: _string(decoded['identityUrl']),
-        clientId: _string(decoded['clientId']),
-        clientSecret: _string(decoded['clientSecret']),
-        scope: _string(decoded['scope']),
-        accessToken: _string(decoded['accessToken']),
-        refreshToken: _string(decoded['refreshToken']),
-        accessExpiresAt: _date(decoded['accessExpiresAt']),
-        xsds: [
-          for (final item in decoded['xsds'] is List ? decoded['xsds'] as List : const [])
-            if (XsdEntry.fromJson(item) case final entry?) entry,
+      if (decoded is! Map) return _initial();
+      if (decoded['contours'] is List) {
+        final contours = <IntegrationContour>[
+          for (final item in decoded['contours'] as List)
+            if (IntegrationContour.fromJson(item) case final contour?) contour,
+        ];
+        if (contours.isEmpty) return empty;
+        final requested = decoded['activeId'];
+        final activeId = requested is String && contours.any((contour) => contour.id == requested)
+            ? requested
+            : contours.first.id;
+        return IntegrationCatalog(activeId: activeId, contours: contours);
+      }
+      return IntegrationCatalog(
+        activeId: 'contour-1',
+        contours: [
+          IntegrationContour(id: 'contour-1', name: 'Контур 1', settings: IntegrationSettings._fromMap(decoded)),
         ],
-        xsdsFetchedAt: _date(decoded['xsdsFetchedAt']),
       );
     } catch (_) {
-      return empty;
+      return _initial();
     }
   }
 
-  String encode() => jsonEncode(toJson());
+  static IntegrationCatalog _initial() {
+    return const IntegrationCatalog(
+      activeId: 'contour-1',
+      contours: [IntegrationContour(id: 'contour-1', name: 'Контур 1', settings: IntegrationSettings.empty)],
+    );
+  }
 }
 
 const _keep = Object();

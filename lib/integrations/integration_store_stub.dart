@@ -8,8 +8,8 @@ class _MemoryIntegrationStore implements IntegrationStore {
   final DraftKeyValueStore _kv = MapDraftKeyValueStore({});
 
   @override
-  IntegrationSettings read() => IntegrationSettings.decode(_kv.read(integrationStorageKey));
+  IntegrationCatalog read() => IntegrationCatalog.decode(_kv.read(integrationStorageKey));
 
   @override
-  void write(IntegrationSettings settings) => _kv.write(integrationStorageKey, settings.encode());
+  void write(IntegrationCatalog catalog) => _kv.write(integrationStorageKey, catalog.encode());
 }

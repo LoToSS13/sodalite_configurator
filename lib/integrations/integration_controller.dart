@@ -20,7 +20,7 @@ class IntegrationController extends ChangeNotifier {
     : _store = store ?? createIntegrationStore(),
       _http = http ?? createIntegrationHttp(),
       _oauth = oauth ?? createOAuthBrowser() {
-    _settings = _store.read();
+    _catalog = _store.read();
     _boot();
   }
 
@@ -28,7 +28,7 @@ class IntegrationController extends ChangeNotifier {
   final IntegrationHttp _http;
   final OAuthBrowser _oauth;
 
-  late IntegrationSettings _settings;
+  late IntegrationCatalog _catalog;
   String? _notice;
   var _noticeIsError = false;
   var _busyLogin = false;
@@ -36,7 +36,13 @@ class IntegrationController extends ChangeNotifier {
   var _busyXsds = false;
   var _busyUpload = false;
 
-  IntegrationSettings get settings => _settings;
+  IntegrationSettings get settings => _catalog.settings;
+
+  List<IntegrationContour> get contours => _catalog.contours;
+
+  String? get activeContourId => _catalog.active?.id;
+
+  String? get activeContourName => _catalog.active?.name;
 
   String? get notice => _notice;
 
@@ -58,7 +64,7 @@ class IntegrationController extends ChangeNotifier {
       unawaited(finishLogin(callback));
       return;
     }
-    unawaited(refreshXsds(silent: !_settings.signedIn));
+    unawaited(refreshXsds(silent: !settings.signedIn));
   }
 
   void updateConnection({
@@ -70,16 +76,51 @@ class IntegrationController extends ChangeNotifier {
     required String clientSecret,
     required String scope,
   }) {
-    _settings = _settings.copyWith(
-      consulUrl: consulUrl,
-      consulToken: consulToken,
-      jasperApiUrl: jasperApiUrl,
-      identityUrl: identityUrl,
-      clientId: clientId,
-      clientSecret: clientSecret,
-      scope: scope,
+    _saveActive(
+      settings.copyWith(
+        consulUrl: consulUrl,
+        consulToken: consulToken,
+        jasperApiUrl: jasperApiUrl,
+        identityUrl: identityUrl,
+        clientId: clientId,
+        clientSecret: clientSecret,
+        scope: scope,
+      ),
     );
-    _store.write(_settings);
+    notifyListeners();
+  }
+
+  void selectContour(String id) {
+    if (_catalog.active?.id == id || _catalog.contours.every((contour) => contour.id != id)) return;
+    _catalog = _catalog.select(id);
+    _store.write(_catalog);
+    _notice = null;
+    notifyListeners();
+  }
+
+  void addContour(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final contour = IntegrationContour(id: _randomToken(12), name: trimmed, settings: IntegrationSettings.empty);
+    _catalog = _catalog.add(contour);
+    _store.write(_catalog);
+    _notice = null;
+    notifyListeners();
+  }
+
+  void renameContour(String id, String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || _catalog.contours.every((contour) => contour.id != id)) return;
+    _catalog = _catalog.updating(id, name: trimmed);
+    _store.write(_catalog);
+    notifyListeners();
+  }
+
+  void deleteContour(String id) {
+    if (_catalog.contours.every((contour) => contour.id != id)) return;
+    _catalog = _catalog.remove(id);
+    _store.write(_catalog);
+    _notice = null;
     notifyListeners();
   }
 
@@ -90,14 +131,9 @@ class IntegrationController extends ChangeNotifier {
   }
 
   void logout() {
-    _settings = _settings.copyWith(
-      accessToken: '',
-      refreshToken: '',
-      accessExpiresAt: null,
-      xsds: const [],
-      xsdsFetchedAt: null,
+    _saveActive(
+      settings.copyWith(accessToken: '', refreshToken: '', accessExpiresAt: null, xsds: const [], xsdsFetchedAt: null),
     );
-    _store.write(_settings);
     _notice = 'Выход выполнен. Адреса сохранены.';
     _noticeIsError = false;
     notifyListeners();
@@ -106,9 +142,9 @@ class IntegrationController extends ChangeNotifier {
   Future<void> login() async {
     if (_busyLogin) return;
     final missing = <String>[
-      if (!looksLikeHttpUrl(_settings.jasperApiUrl)) 'адрес Jasper',
-      if (!looksLikeHttpUrl(_settings.identityUrl)) 'адрес Identity',
-      if (_settings.clientId.trim().isEmpty) 'идентификатор клиента',
+      if (!looksLikeHttpUrl(settings.jasperApiUrl)) 'Base URL',
+      if (!looksLikeHttpUrl(settings.identityUrl)) 'Auth URL',
+      if (settings.clientId.trim().isEmpty) 'Client ID',
     ];
     if (missing.isNotEmpty) {
       _fail('Заполните: ${missing.join(', ')}.');
@@ -129,10 +165,10 @@ class IntegrationController extends ChangeNotifier {
       _oauth.remember(state: state, verifier: verifier, redirectUri: redirect);
       _oauth.go(
         jasperAuthorizeUri(
-          identityUrl: _settings.identityUrl,
-          clientId: _settings.clientId,
+          identityUrl: settings.identityUrl,
+          clientId: settings.clientId,
           redirectUri: redirect,
-          scope: _settings.scope,
+          scope: settings.scope,
           state: state,
           challenge: challenge,
         ),
@@ -156,9 +192,9 @@ class IntegrationController extends ChangeNotifier {
       }
       final token = await exchangeJasperToken(
         http: _http,
-        identityUrl: _settings.identityUrl,
-        clientId: _settings.clientId,
-        clientSecret: _settings.clientSecret,
+        identityUrl: settings.identityUrl,
+        clientId: settings.clientId,
+        clientSecret: settings.clientSecret,
         grant: {
           'grant_type': 'authorization_code',
           'code': callback.code!,
@@ -183,7 +219,7 @@ class IntegrationController extends ChangeNotifier {
 
   Future<void> refreshAccessToken() async {
     if (_busyRefresh) return;
-    if (_settings.refreshToken.trim().isEmpty) {
+    if (settings.refreshToken.trim().isEmpty) {
       _fail('Токена обновления нет. Войдите снова: Identity выдаёт его не при каждом входе.');
       return;
     }
@@ -194,10 +230,10 @@ class IntegrationController extends ChangeNotifier {
     try {
       final token = await exchangeJasperToken(
         http: _http,
-        identityUrl: _settings.identityUrl,
-        clientId: _settings.clientId,
-        clientSecret: _settings.clientSecret,
-        grant: {'grant_type': 'refresh_token', 'refresh_token': _settings.refreshToken.trim()},
+        identityUrl: settings.identityUrl,
+        clientId: settings.clientId,
+        clientSecret: settings.clientSecret,
+        grant: {'grant_type': 'refresh_token', 'refresh_token': settings.refreshToken.trim()},
       );
       _rememberToken(token, keepRefresh: token.refreshToken == null);
       _notice = 'Токен обновлён.';
@@ -214,37 +250,38 @@ class IntegrationController extends ChangeNotifier {
   }
 
   void refreshXsdsIfSignedIn() {
-    if (!_settings.signedIn || _busyLogin || _busyRefresh || _busyXsds) return;
+    if (!settings.signedIn || _busyLogin || _busyRefresh || _busyXsds) return;
     unawaited(refreshXsds());
   }
 
   Future<void> refreshXsds({bool silent = false}) async {
-    if (!_settings.signedIn) {
+    if (!settings.signedIn) {
       if (!silent) _fail('Сначала войдите в Jasper.');
       return;
     }
     if (_busyXsds) return;
-    if (!looksLikeHttpUrl(_settings.jasperApiUrl)) {
-      if (!silent) _fail('Укажите адрес Jasper.');
+    if (!looksLikeHttpUrl(settings.jasperApiUrl)) {
+      if (!silent) _fail('Укажите Base URL.');
       return;
     }
     _busyXsds = true;
     if (!silent) _notice = null;
     notifyListeners();
-    final requestedUrl = _settings.jasperApiUrl;
+    final requestedUrl = settings.jasperApiUrl;
+    final requestedContour = activeContourId;
     try {
-      final list = await fetchJasperXsds(http: _http, apiUrl: requestedUrl, accessToken: _settings.accessToken);
-      if (_settings.jasperApiUrl.trim() != requestedUrl.trim() || !_settings.signedIn) return;
-      final notice = list.isEmpty ? await _emptyXsdNotice(requestedUrl) : 'Список XSD обновлён: ${list.length}.';
-      if (notice == null || _settings.jasperApiUrl.trim() != requestedUrl.trim() || !_settings.signedIn) return;
-      _settings = _settings.copyWith(xsds: list, xsdsFetchedAt: DateTime.now().toUtc());
-      _store.write(_settings);
+      final list = await fetchJasperXsds(http: _http, apiUrl: requestedUrl, accessToken: settings.accessToken);
+      if (!_sameContour(requestedContour, requestedUrl)) return;
+      final notice = list.isEmpty
+          ? await _emptyXsdNotice(requestedUrl, requestedContour)
+          : 'Список XSD обновлён: ${list.length}.';
+      if (notice == null || !_sameContour(requestedContour, requestedUrl)) return;
+      _saveActive(settings.copyWith(xsds: list, xsdsFetchedAt: DateTime.now().toUtc()));
       _notice = notice;
       _noticeIsError = list.isEmpty;
     } catch (error) {
-      if (_settings.jasperApiUrl.trim() != requestedUrl.trim()) {
-        _settings = _settings.copyWith(xsds: const [], xsdsFetchedAt: null);
-        _store.write(_settings);
+      if (activeContourId == requestedContour && settings.jasperApiUrl.trim() != requestedUrl.trim()) {
+        _saveActive(settings.copyWith(xsds: const [], xsdsFetchedAt: null));
       }
       _notice = _message(error, 'Не удалось получить список XSD.');
       _noticeIsError = true;
@@ -256,33 +293,28 @@ class IntegrationController extends ChangeNotifier {
 
   Future<List<String>> listConsulModules() {
     _requireConsul();
-    return consul_read.listConsulModuleSlugs(http: _http, consulUrl: _settings.consulUrl, token: _settings.consulToken);
+    return consul_read.listConsulModuleSlugs(http: _http, consulUrl: settings.consulUrl, token: settings.consulToken);
   }
 
   Future<consul_read.ConsulModuleFolder> readConsulModule(String slug) {
     _requireConsul();
     return consul_read.readConsulModule(
       http: _http,
-      consulUrl: _settings.consulUrl,
-      token: _settings.consulToken,
+      consulUrl: settings.consulUrl,
+      token: settings.consulToken,
       slug: slug,
     );
   }
 
   Future<void> uploadToConsul(ModuleFiles files) async {
-    if (!_settings.consulReady) {
-      throw IntegrationException('Укажите адрес Consul и ключ API.');
+    if (!settings.consulReady) {
+      throw IntegrationException('Укажите URL и Token Consul.');
     }
     if (_busyUpload) return;
     _busyUpload = true;
     notifyListeners();
     try {
-      await uploadModuleToConsul(
-        http: _http,
-        consulUrl: _settings.consulUrl,
-        token: _settings.consulToken,
-        files: files,
-      );
+      await uploadModuleToConsul(http: _http, consulUrl: settings.consulUrl, token: settings.consulToken, files: files);
       _notice = 'Модуль ${files.slug} записан в Consul.';
       _noticeIsError = false;
     } catch (error) {
@@ -296,30 +328,52 @@ class IntegrationController extends ChangeNotifier {
     }
   }
 
+  Future<consul_read.ConsulFolderSnapshot?> inspectConsulModule(String slug) {
+    _requireConsul();
+    return consul_read.inspectConsulModule(
+      http: _http,
+      consulUrl: settings.consulUrl,
+      token: settings.consulToken,
+      slug: slug,
+    );
+  }
+
   void _requireConsul() {
-    if (!_settings.consulReady) {
-      throw IntegrationException('Укажите адрес Consul и ключ API.');
+    if (!settings.consulReady) {
+      throw IntegrationException('Укажите URL и Token Consul.');
     }
   }
 
-  Future<String?> _emptyXsdNotice(String requestedUrl) async {
+  Future<String?> _emptyXsdNotice(String requestedUrl, String? requestedContour) async {
     try {
-      final rights = await fetchJasperRights(http: _http, apiUrl: requestedUrl, accessToken: _settings.accessToken);
-      if (_settings.jasperApiUrl.trim() != requestedUrl.trim() || !_settings.signedIn) return null;
+      final rights = await fetchJasperRights(http: _http, apiUrl: requestedUrl, accessToken: settings.accessToken);
+      if (!_sameContour(requestedContour, requestedUrl)) return null;
       return emptyXsdRightsMessage(rights);
     } catch (error) {
-      if (_settings.jasperApiUrl.trim() != requestedUrl.trim()) return null;
+      if (activeContourId != requestedContour || settings.jasperApiUrl.trim() != requestedUrl.trim()) return null;
       return 'Список XSD пуст. ${_message(error, 'Права клиента запросить не удалось.')}';
     }
   }
 
+  bool _sameContour(String? contourId, String requestedUrl) {
+    return activeContourId == contourId && settings.jasperApiUrl.trim() == requestedUrl.trim() && settings.signedIn;
+  }
+
+  void _saveActive(IntegrationSettings next) {
+    final active = _catalog.active;
+    if (active == null) return;
+    _catalog = _catalog.updating(active.id, settings: next);
+    _store.write(_catalog);
+  }
+
   void _rememberToken(JasperToken token, {bool keepRefresh = false}) {
-    _settings = _settings.copyWith(
-      accessToken: token.accessToken,
-      refreshToken: token.refreshToken ?? (keepRefresh ? _settings.refreshToken : ''),
-      accessExpiresAt: token.expiresAt,
+    _saveActive(
+      settings.copyWith(
+        accessToken: token.accessToken,
+        refreshToken: token.refreshToken ?? (keepRefresh ? settings.refreshToken : ''),
+        accessExpiresAt: token.expiresAt,
+      ),
     );
-    _store.write(_settings);
   }
 
   void _fail(String message) {
