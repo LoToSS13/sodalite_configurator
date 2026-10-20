@@ -14,6 +14,7 @@ import 'package:sodalite_configurator/ui/draft_time.dart';
 import 'package:sodalite_configurator/ui/editor/editor_page.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
 import 'package:sodalite_configurator/ui/sodalite_search_field.dart';
+import 'package:sodalite_configurator/ui/integrations/integrations_panel.dart';
 import 'package:sodalite_configurator/ui/sodalite_dialog.dart';
 
 typedef PickZipBytesFn = Future<List<int>?> Function();
@@ -119,6 +120,8 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
+              const SizedBox(height: 40),
+              const IntegrationsPanel(),
               const SizedBox(height: 40),
               LayoutBuilder(
                 builder: (context, constraints) {

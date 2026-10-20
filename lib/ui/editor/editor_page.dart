@@ -1,5 +1,10 @@
 import 'dart:math' as math;
 
+import 'package:sodalite_configurator/codec/module_codec.dart';
+import 'package:sodalite_configurator/integrations/consul_upload.dart';
+import 'package:sodalite_configurator/integrations/integration_exception.dart';
+import 'package:sodalite_configurator/ui/integrations/integrations_panel.dart';
+import 'package:sodalite_configurator/ui/integrations/integrations_scope.dart';
 import 'package:sodalite_configurator/ui/sodalite_buttons.dart';
 import 'package:flutter/material.dart';
 import 'package:sodalite_configurator/ui/sodalite_help.dart';
@@ -49,6 +54,10 @@ class _EditorPageState extends State<EditorPage> {
     super.initState();
     _seenUndoEpoch = widget.controller.undoEpoch;
     widget.controller.addListener(_onDocument);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Integrations.read(context)?.refreshXsdsIfSignedIn();
+    });
   }
 
   @override
@@ -208,6 +217,71 @@ class _EditorPageState extends State<EditorPage> {
     }
   }
 
+  Future<void> _openIntegrations() {
+    return showIntegrationsDialog(context, onUpload: () => _uploadConsul(fromDialog: true));
+  }
+
+  Future<void> _uploadConsul({bool fromDialog = false}) async {
+    final integrations = Integrations.read(context);
+    if (integrations == null) return;
+    if (!integrations.settings.consulReady) {
+      integrations.explain('Чтобы загрузить модуль, укажите адрес Consul и ключ API.');
+      if (!fromDialog && mounted) await _openIntegrations();
+      return;
+    }
+    if (!widget.controller.canExport) {
+      final fix = await showSodaliteDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('В Consul только готовый модуль'),
+          content: SizedBox(
+            width: 440,
+            child: Text(
+              'В модуле ещё есть замечания: ${widget.controller.issues.length}. '
+              'Исправьте их и повторите загрузку. ZIP по-прежнему можно скачать.',
+            ),
+          ),
+          actions: [
+            SodaliteButton.secondary(onPressed: () => Navigator.pop(context, false), child: const Text('Закрыть')),
+            SodaliteButton.primary(onPressed: () => Navigator.pop(context, true), child: const Text('Доработать')),
+          ],
+        ),
+      );
+      if (fix == true && mounted) _openIssues();
+      return;
+    }
+    final files = encodeModule(widget.controller.root);
+    final removed = removedConsulFiles(files);
+    final removal = removed.isEmpty ? '' : ' Если ${removed.join(' и ')} уже есть в Consul, они будут удалены.';
+    final confirmed = await showSodaliteDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Загрузить в Consul'),
+        content: SizedBox(
+          width: 440,
+          child: Text(
+            'Модуль ${files.slug} будет записан в ${integrations.settings.consulUrl.trim()} '
+            'по пути apps/${files.slug}/. Файлы: ${writtenConsulFiles(files).join(', ')}.$removal '
+            'Запись идёт одним сохранением.',
+          ),
+        ),
+        actions: [
+          SodaliteButton.secondary(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+          SodaliteButton.primary(onPressed: () => Navigator.pop(context, true), child: const Text('Загрузить')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await integrations.uploadToConsul(files);
+      if (!mounted) return;
+      SodaliteToast.show(context, message: 'Модуль записан в Consul');
+    } on IntegrationException catch (error) {
+      if (!mounted) return;
+      SodaliteToast.show(context, kind: SodaliteToastKind.error, message: error.message);
+    }
+  }
+
   void _openIssues() {
     widget.controller.revealIssues();
     showModalBottomSheet<void>(
@@ -279,6 +353,7 @@ class _EditorPageState extends State<EditorPage> {
         final compactBar = width < 700;
         final wide = width >= 1100;
         final inlineJson = width >= 1250;
+        final integrations = Integrations.read(context);
         const minWorkspaceWidth = 400.0;
         final sideSpacing =
             (wide ? 16.0 : 0.0) +
@@ -413,6 +488,30 @@ class _EditorPageState extends State<EditorPage> {
                 onPressed: inlineJson ? () => setState(() => _showJson = !_showJson) : _openJson,
                 icon: Icon(inlineJson ? Icons.view_sidebar_outlined : Icons.data_object),
               ),
+              if (integrations != null)
+                ListenableBuilder(
+                  listenable: integrations,
+                  builder: (context, _) => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SodaliteIconButton(
+                        key: const Key('openIntegrations'),
+                        tooltip: 'Интеграции',
+                        onPressed: _openIntegrations,
+                        icon: const Icon(Icons.cable_outlined),
+                      ),
+                      if (wide)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: SodaliteButton.secondary(
+                            key: const Key('uploadConsulToolbar'),
+                            onPressed: integrations.busyUpload ? null : () => _uploadConsul(),
+                            child: const Text('В Consul'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               if (controller.draftSaveState != DraftSaveState.unavailable)
                 _DraftSaveStatus(controller: controller, compact: compactBar),
               Padding(

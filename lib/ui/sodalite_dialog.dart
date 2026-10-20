@@ -37,7 +37,9 @@ class _SodaliteDialogRoute<T> extends DialogRoute<T> {
     required super.barrierColor,
     required bool reduceMotion,
   }) : _reduceMotion = reduceMotion,
-       super(animationStyle: AnimationStyle(duration: reduceMotion ? Duration.zero : _openDuration));
+       super(
+         animationStyle: const AnimationStyle(duration: _openDuration, reverseDuration: _closeDuration),
+       );
 
   final bool _reduceMotion;
   CurvedAnimation? _curvedAnimation;
@@ -52,7 +54,7 @@ class _SodaliteDialogRoute<T> extends DialogRoute<T> {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    if (_reduceMotion) return child;
+    if (_reduceMotion || animation.status == AnimationStatus.completed) return child;
 
     if (_curvedAnimation?.parent != animation) {
       _curvedAnimation?.dispose();

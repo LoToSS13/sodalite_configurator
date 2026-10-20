@@ -1,0 +1,142 @@
+import 'dart:convert';
+
+import 'package:sodalite_configurator/integrations/service_urls.dart';
+
+class XsdEntry {
+  const XsdEntry({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  Map<String, String> toJson() => {'value': value, 'label': label};
+
+  static XsdEntry? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final value = json['value'];
+    if (value is! String || value.trim().isEmpty) return null;
+    final label = json['label'];
+    return XsdEntry(
+      value: value.trim(),
+      label: label is String && label.trim().isNotEmpty ? label.trim() : value.trim(),
+    );
+  }
+}
+
+class IntegrationSettings {
+  const IntegrationSettings({
+    this.consulUrl = '',
+    this.consulToken = '',
+    this.jasperApiUrl = '',
+    this.identityUrl = '',
+    this.clientId = '',
+    this.clientSecret = '',
+    this.scope = '',
+    this.accessToken = '',
+    this.refreshToken = '',
+    this.accessExpiresAt,
+    this.xsds = const [],
+    this.xsdsFetchedAt,
+  });
+
+  static const empty = IntegrationSettings();
+
+  final String consulUrl;
+  final String consulToken;
+  final String jasperApiUrl;
+  final String identityUrl;
+  final String clientId;
+  final String clientSecret;
+  final String scope;
+  final String accessToken;
+  final String refreshToken;
+  final DateTime? accessExpiresAt;
+  final List<XsdEntry> xsds;
+  final DateTime? xsdsFetchedAt;
+
+  bool get consulReady => looksLikeHttpUrl(consulUrl) && consulToken.trim().isNotEmpty;
+
+  bool get signedIn => accessToken.trim().isNotEmpty;
+
+  IntegrationSettings copyWith({
+    String? consulUrl,
+    String? consulToken,
+    String? jasperApiUrl,
+    String? identityUrl,
+    String? clientId,
+    String? clientSecret,
+    String? scope,
+    String? accessToken,
+    String? refreshToken,
+    Object? accessExpiresAt = _keep,
+    List<XsdEntry>? xsds,
+    Object? xsdsFetchedAt = _keep,
+  }) {
+    return IntegrationSettings(
+      consulUrl: consulUrl ?? this.consulUrl,
+      consulToken: consulToken ?? this.consulToken,
+      jasperApiUrl: jasperApiUrl ?? this.jasperApiUrl,
+      identityUrl: identityUrl ?? this.identityUrl,
+      clientId: clientId ?? this.clientId,
+      clientSecret: clientSecret ?? this.clientSecret,
+      scope: scope ?? this.scope,
+      accessToken: accessToken ?? this.accessToken,
+      refreshToken: refreshToken ?? this.refreshToken,
+      accessExpiresAt: identical(accessExpiresAt, _keep) ? this.accessExpiresAt : accessExpiresAt as DateTime?,
+      xsds: xsds ?? this.xsds,
+      xsdsFetchedAt: identical(xsdsFetchedAt, _keep) ? this.xsdsFetchedAt : xsdsFetchedAt as DateTime?,
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    'consulUrl': consulUrl,
+    'consulToken': consulToken,
+    'jasperApiUrl': jasperApiUrl,
+    'identityUrl': identityUrl,
+    'clientId': clientId,
+    'clientSecret': clientSecret,
+    'scope': scope,
+    'accessToken': accessToken,
+    'refreshToken': refreshToken,
+    'accessExpiresAt': accessExpiresAt?.toUtc().toIso8601String(),
+    'xsds': [for (final entry in xsds) entry.toJson()],
+    'xsdsFetchedAt': xsdsFetchedAt?.toUtc().toIso8601String(),
+  };
+
+  static IntegrationSettings decode(String? raw) {
+    if (raw == null || raw.isEmpty) return empty;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return empty;
+      return IntegrationSettings(
+        consulUrl: _string(decoded['consulUrl']),
+        consulToken: _string(decoded['consulToken']),
+        jasperApiUrl: _string(decoded['jasperApiUrl']),
+        identityUrl: _string(decoded['identityUrl']),
+        clientId: _string(decoded['clientId']),
+        clientSecret: _string(decoded['clientSecret']),
+        scope: _string(decoded['scope']),
+        accessToken: _string(decoded['accessToken']),
+        refreshToken: _string(decoded['refreshToken']),
+        accessExpiresAt: _date(decoded['accessExpiresAt']),
+        xsds: [
+          for (final item in decoded['xsds'] is List ? decoded['xsds'] as List : const [])
+            if (XsdEntry.fromJson(item) case final entry?) entry,
+        ],
+        xsdsFetchedAt: _date(decoded['xsdsFetchedAt']),
+      );
+    } catch (_) {
+      return empty;
+    }
+  }
+
+  String encode() => jsonEncode(toJson());
+}
+
+const _keep = Object();
+
+String _string(Object? value) => value is String ? value : '';
+
+DateTime? _date(Object? value) {
+  if (value is! String || value.isEmpty) return null;
+  return DateTime.tryParse(value);
+}

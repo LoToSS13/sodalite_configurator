@@ -1,4 +1,6 @@
+import 'package:sodalite_configurator/ui/draft_time.dart';
 import 'package:sodalite_configurator/ui/editor/placeholder_field.dart';
+import 'package:sodalite_configurator/ui/integrations/integrations_scope.dart';
 import 'package:sodalite_configurator/ui/editor/placeholder_keys.dart';
 import 'package:sodalite_configurator/ui/help_copy.dart';
 import 'package:sodalite_configurator/ui/sodalite_buttons.dart';
@@ -157,8 +159,10 @@ class _FieldControl extends StatelessWidget {
         floatingLabel: help == null,
       ),
       FieldKind.color => _ColorControl(node: node, spec: spec, controller: controller, label: label, errorText: _error),
-      FieldKind.string ||
-      FieldKind.nonEmptyString => _templateField(value: value is String ? value : '', decoration: decoration),
+      FieldKind.string || FieldKind.nonEmptyString =>
+        spec.key == 'xsdPath'
+            ? _xsdField(context, value: value is String ? value : '', decoration: decoration)
+            : _templateField(value: value is String ? value : '', decoration: decoration),
     };
     if (help == null || (spec.kind == FieldKind.boolean && value is bool)) return control;
     final labelStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(color: SodaliteColors.secondary);
@@ -191,6 +195,67 @@ class _FieldControl extends StatelessWidget {
       key: ValueKey('${node.id}-${spec.key}'),
       value: value,
       source: source,
+      decoration: decoration,
+      onChanged: (text) => controller.setField(node.id, spec.key, text),
+    );
+  }
+
+  Widget _xsdField(BuildContext context, {required String value, required InputDecoration decoration}) {
+    final integrations = Integrations.read(context);
+    if (integrations == null) return _xsdText(value, decoration);
+    return ListenableBuilder(
+      listenable: integrations,
+      builder: (context, _) {
+        final entries = integrations.settings.xsds;
+        final text = _xsdText(
+          value,
+          entries.isEmpty &&
+                  integrations.settings.signedIn &&
+                  decoration.helperText == null &&
+                  decoration.errorText == null
+              ? decoration.copyWith(helperText: 'Список Jasper пуст. Обновите его в «Интеграциях».')
+              : decoration,
+        );
+        if (entries.isEmpty) return text;
+        final values = <String>[
+          if (value.isNotEmpty && entries.every((entry) => entry.value != value)) value,
+          for (final entry in entries) entry.value,
+        ];
+        final fetched = integrations.settings.xsdsFetchedAt;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SodaliteSelect<String>(
+              key: ValueKey('${node.id}-${spec.key}-jasper'),
+              value: value.isNotEmpty && values.contains(value) ? value : null,
+              values: values,
+              labelOf: (id) {
+                for (final entry in entries) {
+                  if (entry.value != id) continue;
+                  return entry.label == entry.value ? entry.value : '${entry.label} — ${entry.value}';
+                }
+                return id;
+              },
+              decoration: InputDecoration(
+                labelText: 'Из списка Jasper',
+                helperText: fetched == null ? 'Список Jasper' : 'Список Jasper, обновлён ${formatDraftWhen(fetched)}',
+              ),
+              onChanged: (next) {
+                if (next != null) controller.setField(node.id, spec.key, next);
+              },
+            ),
+            const SizedBox(height: 16),
+            text,
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _xsdText(String value, InputDecoration decoration) {
+    return SyncedTextField(
+      key: ValueKey('${node.id}-${spec.key}'),
+      value: value,
       decoration: decoration,
       onChanged: (text) => controller.setField(node.id, spec.key, text),
     );

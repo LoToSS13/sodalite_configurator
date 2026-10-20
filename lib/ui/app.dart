@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:sodalite_configurator/integrations/integration_controller.dart';
 import 'package:sodalite_configurator/ui/design_system.dart';
 import 'package:sodalite_configurator/codec/download.dart';
 import 'package:sodalite_configurator/document/document_controller.dart';
 import 'package:sodalite_configurator/persistence/draft_store.dart';
 import 'package:sodalite_configurator/ui/editor/editor_page.dart';
 import 'package:sodalite_configurator/ui/home/home_page.dart';
+import 'package:sodalite_configurator/ui/integrations/integrations_scope.dart';
 
-class ConfiguratorApp extends StatelessWidget {
+class ConfiguratorApp extends StatefulWidget {
   const ConfiguratorApp({
     super.key,
     this.controller,
@@ -23,15 +25,34 @@ class ConfiguratorApp extends StatelessWidget {
   final DraftStore? drafts;
 
   @override
+  State<ConfiguratorApp> createState() => _ConfiguratorAppState();
+}
+
+class _ConfiguratorAppState extends State<ConfiguratorApp> {
+  late final IntegrationController _integrations = IntegrationController();
+
+  @override
+  void dispose() {
+    _integrations.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final downloadFn = download ?? downloadBytes;
+    final downloadFn = widget.download ?? downloadBytes;
     return MaterialApp(
       title: 'Sodalite Configurator',
       debugShowCheckedModeBanner: false,
       theme: sodaliteTheme(),
-      home: controller == null
-          ? HomePage(download: downloadFn, pickZipBytes: pickZipBytes, pickJsonFiles: pickJsonFiles, drafts: drafts)
-          : EditorPage(controller: controller!, download: downloadFn),
+      builder: (context, child) => Integrations(controller: _integrations, child: child ?? const SizedBox.shrink()),
+      home: widget.controller == null
+          ? HomePage(
+              download: downloadFn,
+              pickZipBytes: widget.pickZipBytes,
+              pickJsonFiles: widget.pickJsonFiles,
+              drafts: widget.drafts,
+            )
+          : EditorPage(controller: widget.controller!, download: downloadFn),
     );
   }
 }
