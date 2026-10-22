@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:sodalite_configurator/integrations/integration_controller.dart';
+import 'package:sodalite_configurator/metadata/metadata_controller.dart';
 import 'package:sodalite_configurator/ui/design_system.dart';
 import 'package:sodalite_configurator/codec/download.dart';
 import 'package:sodalite_configurator/document/document_controller.dart';
@@ -7,6 +10,7 @@ import 'package:sodalite_configurator/persistence/draft_store.dart';
 import 'package:sodalite_configurator/ui/editor/editor_page.dart';
 import 'package:sodalite_configurator/ui/home/home_page.dart';
 import 'package:sodalite_configurator/ui/integrations/integrations_scope.dart';
+import 'package:sodalite_configurator/ui/metadata/metadata_scope.dart';
 
 class ConfiguratorApp extends StatefulWidget {
   const ConfiguratorApp({
@@ -30,10 +34,18 @@ class ConfiguratorApp extends StatefulWidget {
 
 class _ConfiguratorAppState extends State<ConfiguratorApp> {
   late final IntegrationController _integrations = IntegrationController();
+  late final MetadataController _metadata = MetadataController();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_metadata.restore());
+  }
 
   @override
   void dispose() {
     _integrations.dispose();
+    _metadata.dispose();
     super.dispose();
   }
 
@@ -44,7 +56,10 @@ class _ConfiguratorAppState extends State<ConfiguratorApp> {
       title: 'Sodalite Configurator',
       debugShowCheckedModeBanner: false,
       theme: sodaliteTheme(),
-      builder: (context, child) => Integrations(controller: _integrations, child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => Integrations(
+        controller: _integrations,
+        child: MetadataScope(controller: _metadata, child: child ?? const SizedBox.shrink()),
+      ),
       home: widget.controller == null
           ? HomePage(
               download: downloadFn,

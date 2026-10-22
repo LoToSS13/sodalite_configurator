@@ -275,7 +275,12 @@ class DocumentController extends ChangeNotifier {
     _commit(previous);
   }
 
-  void addChild({required String parentId, required String slot, required String typeId}) {
+  String? addChild({
+    required String parentId,
+    required String slot,
+    required String typeId,
+    Map<String, Object?> fields = const {},
+  }) {
     final parent = _root.find(parentId);
     if (parent == null) {
       throw ArgumentError.value(parentId, 'parentId', 'Parent node does not exist');
@@ -291,10 +296,14 @@ class DocumentController extends ChangeNotifier {
 
     final currentChildren = parent.childrenBySlot[slot] ?? const <Node>[];
     if (slotSpec.cardinality != SlotCardinality.list && currentChildren.isNotEmpty) {
-      return;
+      return null;
     }
 
-    final child = _newChild(typeId, isAdditionalLayer: slot == 'additionalLayers' && typeId == TypeIds.layer);
+    final child = _newChild(
+      typeId,
+      isAdditionalLayer: slot == 'additionalLayers' && typeId == TypeIds.layer,
+      fields: fields,
+    );
     final changed = _replaceNode(
       _root,
       parentId,
@@ -307,7 +316,9 @@ class DocumentController extends ChangeNotifier {
     );
     if (changed != null) {
       _commit(changed);
+      return child.id;
     }
+    return null;
   }
 
   void removeNode(String nodeId) {
@@ -359,7 +370,7 @@ class DocumentController extends ChangeNotifier {
     return buildModuleZip(encodeModule(_root));
   }
 
-  Node _newChild(String typeId, {required bool isAdditionalLayer}) {
+  Node _newChild(String typeId, {required bool isAdditionalLayer, Map<String, Object?> fields = const {}}) {
     if (typeId == TypeIds.layer) {
       return Node(
         id: newNodeId(),
@@ -376,11 +387,12 @@ class DocumentController extends ChangeNotifier {
       );
     }
 
-    final fields = <String, Object?>{
+    final initial = <String, Object?>{
       for (final field in catalog.type(typeId).fields)
         if (field.defaultValue != null) field.key: field.defaultValue,
     };
-    return Node(id: newNodeId(), typeId: typeId, fields: fields);
+    initial.addAll(fields);
+    return Node(id: newNodeId(), typeId: typeId, fields: initial);
   }
 
   void _commit(Node root, {bool saveDraft = true}) {

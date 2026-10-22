@@ -10,6 +10,7 @@ import 'package:sodalite_configurator/ui/editor/field_controls.dart';
 import 'package:sodalite_configurator/ui/editor/filter_rows.dart';
 import 'package:sodalite_configurator/ui/editor/node_summary.dart';
 import 'package:sodalite_configurator/ui/editor/slot_add_button.dart';
+import 'package:sodalite_configurator/ui/metadata/metadata_actions.dart';
 import 'package:sodalite_configurator/ui/strings.dart';
 import 'package:sodalite_configurator/ui/sodalite_dialog.dart';
 import 'package:sodalite_configurator/ui/help_copy.dart';
@@ -235,7 +236,16 @@ class BlockCard extends StatelessWidget {
       if (_canAdd(slot, children.length))
         Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: SlotAddButton(parentId: node.id, slot: slot, catalog: controller.catalog, controller: controller),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SlotAddButton(parentId: node.id, slot: slot, catalog: controller.catalog, controller: controller),
+              if (slot.key == 'fields' && node.typeId == TypeIds.infoSection) ...[
+                const SizedBox(height: 8),
+                MetadataFieldButton(sectionId: node.id, controller: controller),
+              ],
+            ],
+          ),
         ),
     ];
   }

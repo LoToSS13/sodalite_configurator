@@ -5,8 +5,11 @@ import 'package:sodalite_configurator/integrations/consul_read.dart';
 import 'package:sodalite_configurator/integrations/consul_upload.dart';
 import 'package:sodalite_configurator/integrations/integration_controller.dart';
 import 'package:sodalite_configurator/integrations/integration_exception.dart';
+import 'package:sodalite_configurator/metadata/metadata_catalog.dart';
 import 'package:sodalite_configurator/ui/integrations/integrations_panel.dart';
 import 'package:sodalite_configurator/ui/integrations/integrations_scope.dart';
+import 'package:sodalite_configurator/ui/metadata/metadata_dialog.dart';
+import 'package:sodalite_configurator/ui/metadata/metadata_scope.dart';
 import 'package:sodalite_configurator/ui/sodalite_buttons.dart';
 import 'package:flutter/material.dart';
 import 'package:sodalite_configurator/ui/sodalite_help.dart';
@@ -174,6 +177,8 @@ class _EditorPageState extends State<EditorPage> {
       ),
     );
   }
+
+  Future<void> _openMetadata() => showMetadataDialog(context);
 
   Future<void> _export() async {
     if (!widget.controller.canExport) {
@@ -474,6 +479,18 @@ class _EditorPageState extends State<EditorPage> {
                 onPressed: inlineJson ? () => setState(() => _showJson = !_showJson) : _openJson,
                 icon: Icon(inlineJson ? Icons.view_sidebar_outlined : Icons.data_object),
               ),
+              if (MetadataScope.read(context) case final metadata?)
+                ListenableBuilder(
+                  listenable: metadata,
+                  builder: (context, _) => SodaliteIconButton(
+                    key: const Key('openMetadata'),
+                    tooltip: metadata.catalog == null
+                        ? 'Метаданные'
+                        : 'Метаданные: ${metadataCountLabel(metadata.catalog!.cards.length, cards: true)}',
+                    onPressed: _openMetadata,
+                    icon: const Icon(Icons.account_tree_outlined),
+                  ),
+                ),
               if (integrations != null)
                 ListenableBuilder(
                   listenable: integrations,

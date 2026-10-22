@@ -1,5 +1,8 @@
+import 'package:sodalite_configurator/metadata/metadata_catalog.dart';
 import 'package:sodalite_configurator/ui/draft_time.dart';
 import 'package:sodalite_configurator/ui/editor/placeholder_field.dart';
+import 'package:sodalite_configurator/ui/metadata/metadata_actions.dart';
+import 'package:sodalite_configurator/ui/metadata/metadata_scope.dart';
 import 'package:sodalite_configurator/ui/integrations/integrations_scope.dart';
 import 'package:sodalite_configurator/ui/editor/placeholder_keys.dart';
 import 'package:sodalite_configurator/ui/help_copy.dart';
@@ -162,6 +165,8 @@ class _FieldControl extends StatelessWidget {
       FieldKind.string || FieldKind.nonEmptyString =>
         spec.key == 'xsdPath'
             ? _xsdField(context, value: value is String ? value : '', decoration: decoration)
+            : node.typeId == TypeIds.info && spec.key == 'alias'
+            ? _infoAlias(context, value: value is String ? value : '', decoration: decoration)
             : _templateField(value: value is String ? value : '', decoration: decoration),
     };
     if (help == null || (spec.kind == FieldKind.boolean && value is bool)) return control;
@@ -178,6 +183,46 @@ class _FieldControl extends StatelessWidget {
         ),
         control,
       ],
+    );
+  }
+
+  Widget _infoAlias(BuildContext context, {required String value, required InputDecoration decoration}) {
+    final metadata = MetadataScope.read(context);
+    final field = _templateField(value: value, decoration: decoration);
+    if (metadata == null) return field;
+    return ListenableBuilder(
+      listenable: metadata,
+      builder: (context, _) {
+        final catalog = metadata.catalog;
+        final card = catalog?.card(value);
+        final caption = card == null
+            ? catalog != null && value.isNotEmpty
+                  ? 'В загруженном файле нет карточки $value'
+                  : null
+            : '${metadataTypeTitle(card.type)} «${card.name.isEmpty ? card.alias : card.name}», ${metadataCountLabel(card.fields.length, cards: false)}';
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            field,
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SodaliteButton.ghost(
+                key: ValueKey('${node.id}-metadata-card'),
+                onPressed: () async {
+                  final chosen = await chooseMetadataCard(context);
+                  if (chosen != null && context.mounted) controller.setField(node.id, spec.key, chosen.alias);
+                },
+                child: Text(catalog == null ? 'Загрузить метаданные' : 'Выбрать карточку'),
+              ),
+            ),
+            if (caption != null) ...[
+              const SizedBox(height: 4),
+              Text(caption, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: SodaliteColors.secondary)),
+            ],
+          ],
+        );
+      },
     );
   }
 
@@ -423,6 +468,23 @@ class _StringMapControl extends StatelessWidget {
     return const [];
   }
 
+  Future<void> _addPathFromMetadata(BuildContext context) async {
+    final alias = node.fields['alias'];
+    final field = await pickMetadataField(
+      context,
+      alias: alias is String ? alias : null,
+      infoId: node.id,
+      document: controller,
+    );
+    if (field == null || !context.mounted) return;
+    final entries = _entries;
+    if (entries.any((entry) => entry.key == field.alias)) {
+      notifyDuplicatePath(context, field.alias);
+      return;
+    }
+    _commit([...entries, MapEntry(field.alias, field.alias)]);
+  }
+
   void _commit(List<MapEntry<String, String>> entries) {
     final keys = [for (final entry in entries) entry.key];
     final blank = keys.any((key) => key.trim().isEmpty);
@@ -505,19 +567,30 @@ class _StringMapControl extends StatelessWidget {
             ),
           Align(
             alignment: Alignment.centerLeft,
-            child: SodaliteButton.ghost(
-              key: ValueKey('${node.id}-${spec.key}-add'),
-              onPressed: () {
-                var key = '';
-                var suffix = 0;
-                final used = {for (final entry in entries) entry.key};
-                while (used.contains(key)) {
-                  key = 'key$suffix';
-                  suffix += 1;
-                }
-                _commit([...entries, MapEntry(key, '')]);
-              },
-              child: const Text(UiStrings.addEntry),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SodaliteButton.ghost(
+                  key: ValueKey('${node.id}-${spec.key}-add'),
+                  onPressed: () {
+                    var key = '';
+                    var suffix = 0;
+                    final used = {for (final entry in entries) entry.key};
+                    while (used.contains(key)) {
+                      key = 'key$suffix';
+                      suffix += 1;
+                    }
+                    _commit([...entries, MapEntry(key, '')]);
+                  },
+                  child: const Text(UiStrings.addEntry),
+                ),
+                if (node.typeId == TypeIds.info && spec.key == 'paths' && MetadataScope.read(context) != null)
+                  SodaliteButton.ghost(
+                    key: ValueKey('${node.id}-paths-metadata'),
+                    onPressed: () => _addPathFromMetadata(context),
+                    child: const Text('Поле из метаданных'),
+                  ),
+              ],
             ),
           ),
         ],

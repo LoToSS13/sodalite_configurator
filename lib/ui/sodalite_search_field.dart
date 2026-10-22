@@ -8,9 +8,16 @@ import 'sodalite_tooltip.dart';
 /// Desktop adaptation of Sodalite Search bar 96:26141.
 /// Filters immediately; clearing keeps keyboard focus in the field.
 class SodaliteSearchField extends StatefulWidget {
-  const SodaliteSearchField({super.key, required this.onChanged});
+  const SodaliteSearchField({
+    super.key,
+    required this.onChanged,
+    this.hintText = 'Название или идентификатор',
+    this.semanticLabel = 'Поиск черновиков',
+  });
 
   final ValueChanged<String> onChanged;
+  final String hintText;
+  final String semanticLabel;
 
   @override
   State<SodaliteSearchField> createState() => _SodaliteSearchFieldState();
@@ -41,7 +48,7 @@ class _SodaliteSearchFieldState extends State<SodaliteSearchField> {
       bindings: {const SingleActivator(LogicalKeyboardKey.escape): _clear},
       child: Semantics(
         container: true,
-        label: 'Поиск черновиков',
+        label: widget.semanticLabel,
         child: ValueListenableBuilder<TextEditingValue>(
           valueListenable: _controller,
           builder: (context, value, _) => TextField(
@@ -56,7 +63,7 @@ class _SodaliteSearchFieldState extends State<SodaliteSearchField> {
             decoration: InputDecoration(
               constraints: const BoxConstraints.tightFor(height: 48),
               isDense: true,
-              hintText: 'Название или идентификатор',
+              hintText: widget.hintText,
               hintStyle: textStyle?.copyWith(color: SodaliteColors.secondary),
               fillColor: SodaliteColors.surface,
               hoverColor: Colors.transparent,
