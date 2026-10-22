@@ -9,6 +9,7 @@ import 'package:sodalite_configurator/metadata/metadata_catalog.dart';
 import 'package:sodalite_configurator/ui/integrations/integrations_panel.dart';
 import 'package:sodalite_configurator/ui/integrations/integrations_scope.dart';
 import 'package:sodalite_configurator/ui/metadata/metadata_dialog.dart';
+import 'package:sodalite_configurator/ui/metadata/metadata_field_panel.dart';
 import 'package:sodalite_configurator/ui/metadata/metadata_scope.dart';
 import 'package:sodalite_configurator/ui/sodalite_buttons.dart';
 import 'package:flutter/material.dart';
@@ -152,6 +153,21 @@ class _EditorPageState extends State<EditorPage> {
     setState(() => _layerTabs[layer.id] = index);
     // Clear an old descendant selection even when the destination has no block yet.
     widget.controller.select(target?.id ?? layer.id);
+  }
+
+  bool _infoPanelOpen(BuildContext context) {
+    if (MetadataScope.read(context) == null) return false;
+    final root = widget.controller.root;
+    final layers = switch (_section) {
+      EditorSection.baseLayer => root.childrenBySlot['baseLayer'] ?? const <Node>[],
+      EditorSection.additionalLayers => root.childrenBySlot['additionalLayers'] ?? const <Node>[],
+      _ => const <Node>[],
+    };
+    for (final layer in layers) {
+      if ((_layerTabs[layer.id] ?? 0) != 2) continue;
+      if (layer.childrenBySlot['info']?.isNotEmpty ?? false) return true;
+    }
+    return false;
   }
 
   void _openJson() {
@@ -569,7 +585,7 @@ class _EditorPageState extends State<EditorPage> {
                         ),
                         child: Center(
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 880),
+                            constraints: BoxConstraints(maxWidth: _infoPanelOpen(context) ? 1200 : 880),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
@@ -846,6 +862,30 @@ class _LayerTabsState extends State<_LayerTabs> {
     });
   }
 
+  Widget _infoWithFields(Node info) {
+    final card = BlockCard(node: info, controller: controller, depth: 1);
+    if (MetadataScope.read(context) == null) return card;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final panel = MetadataFieldPanel(infoId: info.id, controller: controller);
+        if (constraints.maxWidth < 760) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [card, const SizedBox(height: 16), panel],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: card),
+            const SizedBox(width: 16),
+            SizedBox(width: 340, child: panel),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final geo = layer.childrenBySlot['geo']?.firstOrNull;
@@ -872,7 +912,7 @@ class _LayerTabsState extends State<_LayerTabs> {
               ),
       2 =>
         info != null
-            ? BlockCard(node: info, controller: controller, depth: 1)
+            ? _infoWithFields(info)
             : SlotAddButton(
                 parentId: layer.id,
                 slot: controller.catalog.type(layer.typeId).slots.firstWhere((slot) => slot.key == 'info'),
